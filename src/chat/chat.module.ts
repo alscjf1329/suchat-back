@@ -4,11 +4,11 @@ import { ChatGateway } from './chat.gateway';
 import { ChatService } from './chat.service';
 import { PostgresChatRepository } from './repositories/postgres-chat.repository';
 import { MemoryChatRepository } from './repositories/memory-chat.repository';
-import { ChatRoom, Message } from './entities';
+import { ChatRoom, Message, ChatRoomParticipant } from './entities';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([ChatRoom, Message]),
+    TypeOrmModule.forFeature([ChatRoom, Message, ChatRoomParticipant]),
   ],
   providers: [
     ChatGateway,

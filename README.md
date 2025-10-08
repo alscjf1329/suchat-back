@@ -1,54 +1,113 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# SuChat Backend 🚀
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+NestJS 기반의 실시간 채팅 서버
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## 📋 프로젝트 소개
 
-## Description
+SuChat Backend는 NestJS 프레임워크를 기반으로 구축된 실시간 채팅 애플리케이션의 서버 사이드입니다. WebSocket을 통한 실시간 통신, 파일 업로드 처리, 그리고 PostgreSQL과 Redis를 활용한 확장 가능한 아키텍처를 제공합니다.
 
-**Suchat Backend** - 텔레그램급 그룹 채팅 앱을 위한 NestJS 백엔드 서버
+## ✨ 주요 기능
 
-### 주요 기능
-- 🗨️ 실시간 그룹 채팅 (WebSocket 기반)
-- 📁 파일 업로드 및 처리 (이미지, 동영상, 문서)
-- 🐂 비동기 파일 처리 큐 (BullMQ)
-- 📱 PWA 지원
-- 🔄 Redis 기반 메시지 브로커
-- 💾 로컬 파일 저장소
+- 💬 **실시간 채팅**: Socket.IO를 통한 실시간 메시지 송수신
+- 🏠 **채팅방 관리**: 채팅방 생성, 참여, 퇴장 기능
+- 📁 **파일 업로드**: 이미지, 비디오, 문서 파일 업로드 및 처리
+- 🖼️ **이미지 최적화**: Sharp를 활용한 이미지 리사이징 및 썸네일 생성
+- 🔄 **비동기 처리**: Bull Queue를 통한 파일 처리 작업 관리
+- 🗄️ **데이터 저장**: PostgreSQL 데이터베이스와 메모리 DB 지원
+- 📊 **관리 도구**: pgAdmin, Redis Commander 포함
 
-## Project setup
+## 🛠 기술 스택
 
-### 1. 의존성 설치
+- **Backend Framework**: NestJS 11
+- **Language**: TypeScript
+- **Database**: PostgreSQL 15
+- **Cache**: Redis 7
+- **WebSocket**: Socket.IO
+- **File Processing**: Sharp, Multer
+- **Queue**: Bull Queue
+- **ORM**: TypeORM
+- **Container**: Docker & Docker Compose
+
+## 🚀 시작하기
+
+### 사전 요구사항
+
+- Node.js 18+ 
+- Docker & Docker Compose
+- npm 또는 yarn
+
+### 설치 및 실행
+
 ```bash
-$ npm install
+# 의존성 설치
+npm install
+
+# 환경 변수 설정
+cp env-example.txt .env
+# .env 파일을 편집하여 데이터베이스 및 Redis 설정
+
+# Docker 컨테이너 실행 (PostgreSQL, Redis, 관리 도구)
+npm run docker:start
+
+# 개발 서버 실행
+npm run start:dev
+
+# 프로덕션 빌드
+npm run build
+
+# 프로덕션 서버 실행
+npm run start:prod
 ```
 
-### 2. 환경 설정
-프로젝트 루트에 `.env` 파일을 생성하고 다음 내용을 추가하세요:
+### Docker 명령어
+
+```bash
+# 데이터베이스 시작
+npm run docker:start
+
+# 데이터베이스 중지
+npm run docker:stop
+
+# 데이터베이스 상태 확인
+npm run docker:status
+
+# 데이터베이스 초기화
+npm run docker:clean
+```
+
+## 📁 프로젝트 구조
+
+```
+src/
+├── app.module.ts              # 메인 애플리케이션 모듈
+├── main.ts                    # 애플리케이션 진입점
+├── chat/                      # 채팅 관련 모듈
+│   ├── chat.gateway.ts        # WebSocket 게이트웨이
+│   ├── chat.service.ts        # 채팅 비즈니스 로직
+│   ├── entities/              # 데이터베이스 엔티티
+│   └── repositories/          # 데이터 접근 계층
+├── file/                      # 파일 처리 모듈
+│   ├── file.controller.ts     # 파일 업로드 API
+│   ├── file.service.ts        # 파일 처리 서비스
+│   └── file.processor.ts      # 비동기 파일 처리
+├── config/                    # 설정 파일들
+│   ├── app.config.ts         # 애플리케이션 설정
+│   ├── database.config.ts    # 데이터베이스 설정
+│   └── redis.config.ts       # Redis 설정
+└── queues/                    # Bull Queue 설정
+    └── bull.config.ts        # Redis 연결 설정
+```
+
+## 🔧 환경 설정
+
+### 환경 변수
 
 ```env
-# Database
+# Database (PostgreSQL)
 DB_HOST=localhost
-DB_PORT=3306
-DB_USERNAME=root
-DB_PASSWORD=
+DB_PORT=5432
+DB_USERNAME=postgres
+DB_PASSWORD=your_password
 DB_DATABASE=suchat
 
 # Redis
@@ -63,168 +122,97 @@ NODE_ENV=development
 # File Upload
 MAX_FILE_SIZE=104857600
 UPLOAD_PATH=./uploads
+
+# Database Mode (true = 메모리, false = PostgreSQL)
+USE_MEMORY_DB=false
 ```
 
-### 3. 데이터베이스 서비스 실행
+### 관리 도구 접속
 
-#### 🐳 Docker 사용 (추천)
-```bash
-# Windows
-start-db.bat
+- **pgAdmin**: http://localhost:8080 (admin@suchat.com / admin123)
+- **Redis Commander**: http://localhost:8081
 
-# Linux/Mac
-./start-db.sh
+## 📡 API 엔드포인트
 
-# 또는 직접 실행
-docker-compose up -d
-```
+### 파일 업로드
+- `POST /file/upload` - 파일 업로드
+- `GET /file/status/:jobId` - 파일 처리 상태 확인
+- `GET /file/serve/:type/:filename` - 파일 서빙
 
-#### 📋 서비스 정보
-- **PostgreSQL**: `localhost:5432` (postgres/postgres123)
-- **Redis**: `localhost:6379`
-- **pgAdmin**: `http://localhost:8080` (admin@suchat.com/admin123)
-- **Redis Commander**: `http://localhost:8081`
+### WebSocket 이벤트
+- `join_room` - 채팅방 참여
+- `leave_room` - 채팅방 퇴장
+- `send_message` - 메시지 전송
+- `create_room` - 채팅방 생성
+- `get_user_rooms` - 사용자 채팅방 목록
 
-#### 🛠️ 관리 스크립트
-- `start-db.bat` / `start-db.sh`: 서비스 시작
-- `stop-db.bat`: 서비스 중지
-- `clean-db.bat`: 데이터 완전 삭제
-- `status-db.bat`: 서비스 상태 확인
+## 🗄️ 데이터베이스 스키마
 
-### 4. 프로젝트 구조
-```
-src/
-├── chat/           # 채팅 관련 모듈
-├── file/           # 파일 업로드 및 처리
-├── queues/         # BullMQ 큐 설정
-├── config/         # 환경 설정
-└── common/         # 공통 유틸리티
+### 채팅방 (chat_rooms)
+- `id`: UUID (Primary Key)
+- `name`: 채팅방 이름
+- `description`: 채팅방 설명
+- `participants`: 참여자 배열
+- `created_at`, `updated_at`: 타임스탬프
 
-uploads/            # 파일 저장소
-├── images/         # 이미지 파일
-├── videos/         # 동영상 파일
-├── docs/           # 문서 파일
-├── thumbnails/     # 썸네일
-└── temp/           # 임시 파일
-```
+### 메시지 (messages)
+- `id`: UUID (Primary Key)
+- `room_id`: 채팅방 ID (Foreign Key)
+- `user_id`: 사용자 ID
+- `content`: 메시지 내용
+- `type`: 메시지 타입 (text, image, video, file)
+- `file_url`, `file_name`, `file_size`: 파일 정보
+- `timestamp`: 전송 시간
 
-## Compile and run the project
+## 🔄 파일 처리 워크플로우
 
-```bash
-# development
-$ npm run start
+1. **업로드**: 클라이언트가 파일을 `/file/upload`로 전송
+2. **임시 저장**: 파일을 `uploads/temp/`에 임시 저장
+3. **큐 작업**: Bull Queue에 파일 처리 작업 추가
+4. **비동기 처리**: 
+   - 이미지: Sharp로 리사이징 및 최적화
+   - 썸네일 생성
+   - 최종 디렉토리로 이동
+5. **완료**: 처리된 파일 정보 반환
 
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
-```
-
-## API 엔드포인트
-
-### WebSocket 이벤트 (Socket.IO)
-- `join_room`: 채팅방 참가
-- `leave_room`: 채팅방 퇴장
-- `send_message`: 메시지 전송
-- `create_room`: 채팅방 생성
-- `get_user_rooms`: 사용자 채팅방 목록
-
-### HTTP API
-- `POST /file/upload`: 파일 업로드
-- `GET /file/status/:jobId`: 파일 처리 상태 확인
-- `GET /file/serve/:type/:filename`: 파일 서빙
-
-## 사용 예시
-
-### 1. 채팅방 생성 및 참가
-```javascript
-// Socket.IO 클라이언트
-socket.emit('create_room', {
-  name: '테스트 채팅방',
-  description: '테스트용 채팅방입니다',
-  userId: 'user123'
-});
-
-socket.emit('join_room', {
-  roomId: 'room456',
-  userId: 'user123'
-});
-```
-
-### 2. 메시지 전송
-```javascript
-socket.emit('send_message', {
-  roomId: 'room456',
-  userId: 'user123',
-  content: '안녕하세요!',
-  type: 'text'
-});
-```
-
-### 3. 파일 업로드
-```javascript
-// FormData로 파일 업로드
-const formData = new FormData();
-formData.append('file', file);
-formData.append('userId', 'user123');
-formData.append('roomId', 'room456');
-
-fetch('/file/upload', {
-  method: 'POST',
-  body: formData
-});
-```
-
-## Run tests
+## 🧪 테스트
 
 ```bash
-# unit tests
-$ npm run test
+# 단위 테스트
+npm run test
 
-# e2e tests
-$ npm run test:e2e
+# 테스트 감시 모드
+npm run test:watch
 
-# test coverage
-$ npm run test:cov
+# 커버리지 테스트
+npm run test:cov
+
+# E2E 테스트
+npm run test:e2e
 ```
 
-## Deployment
+## 📝 스크립트
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+- `npm run build` - 프로덕션 빌드
+- `npm run start` - 프로덕션 서버 실행
+- `npm run start:dev` - 개발 서버 실행 (감시 모드)
+- `npm run start:debug` - 디버그 모드 실행
+- `npm run lint` - ESLint 검사 및 수정
+- `npm run format` - Prettier 포맷팅
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+## 🐳 Docker 구성
 
-```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
-```
+프로젝트는 다음 Docker 서비스들을 포함합니다:
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+- **PostgreSQL 15**: 메인 데이터베이스
+- **Redis 7**: 캐시 및 큐 저장소
+- **pgAdmin**: PostgreSQL 관리 도구
+- **Redis Commander**: Redis 관리 도구
 
-## Resources
+## 📄 라이선스
 
-Check out a few resources that may come in handy when working with NestJS:
+UNLICENSED
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+---
 
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+**SuChat Backend** - 확장 가능하고 안정적인 채팅 서버를 제공합니다. 🚀💬

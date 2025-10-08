@@ -20,3 +20,11 @@ UPLOAD_PATH=./uploads
 
 # Database Mode (true = 메모리, false = PostgreSQL)
 USE_MEMORY_DB=false
+
+# Email Configuration
+EMAIL_HOST=smtp.gmail.com
+EMAIL_PORT=587
+EMAIL_USER=your_email@gmail.com
+EMAIL_PASS=your_app_password
+EMAIL_FROM=noreply@suchat.com
+FRONTEND_URL=http://localhost:3001

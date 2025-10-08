@@ -1,5 +1,6 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
 import { ChatRoom } from './chat-room.entity';
+import { User } from '../../user/entities/user.entity';
 
 @Entity('messages')
 export class Message {
@@ -37,4 +38,8 @@ export class Message {
   @ManyToOne(() => ChatRoom, room => room.messages)
   @JoinColumn({ name: 'roomId' })
   room: ChatRoom;
+
+  @ManyToOne(() => User, user => user.messages, { nullable: true })
+  @JoinColumn({ name: 'userId' })
+  user?: User;
 }

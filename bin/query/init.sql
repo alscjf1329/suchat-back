@@ -1,0 +1,197 @@
+-- ========================================
+-- SuChat 데이터베이스 초기화 스크립트
+-- Version: 1.1.0
+-- Date: 2025-10-07
+-- ========================================
+-- 
+-- 사용법:
+-- 1. Docker: Get-Content bin/query/init.sql | docker exec -i suchat-postgres psql -U postgres -d suchat
+-- 2. pgAdmin: 전체 복사 후 실행
+-- 3. DBeaver: 전체 복사 후 실행
+--
+-- ========================================
+
+-- ========================================
+-- 1. 테이블 생성
+-- ========================================
+
+-- 1.1 사용자 테이블
+CREATE TABLE IF NOT EXISTS users (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name VARCHAR(100) NOT NULL,
+  email VARCHAR(255) UNIQUE NOT NULL,
+  password VARCHAR(255) NOT NULL,
+  phone VARCHAR(20),
+  birthday DATE,
+  "isActive" BOOLEAN NOT NULL DEFAULT true,
+  "lastLoginAt" TIMESTAMP,
+  "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 1.2 이메일 인증 테이블
+CREATE TABLE IF NOT EXISTS email_verifications (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  email VARCHAR(255) NOT NULL,
+  token VARCHAR(255) NOT NULL,
+  type VARCHAR(50) NOT NULL DEFAULT 'signup',
+  "expiresAt" TIMESTAMP NOT NULL,
+  "isVerified" BOOLEAN NOT NULL DEFAULT false,
+  "userData" JSONB,
+  "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 1.3 채팅방 테이블 (최적화됨)
+CREATE TABLE IF NOT EXISTS chat_rooms (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name VARCHAR(255) NOT NULL,
+  description TEXT,
+  participants TEXT[] DEFAULT '{}',
+  "lastMessageId" UUID,
+  "lastMessageAt" TIMESTAMP,
+  "dmKey" VARCHAR(255) UNIQUE,
+  "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 1.4 채팅방 참여자 테이블 (신규)
+CREATE TABLE IF NOT EXISTS chat_room_participants (
+  "roomId" UUID NOT NULL,
+  "userId" UUID NOT NULL,
+  role VARCHAR(20) NOT NULL DEFAULT 'member' CHECK (role IN ('owner', 'admin', 'member')),
+  "lastReadMessageId" UUID,
+  muted BOOLEAN NOT NULL DEFAULT false,
+  pinned BOOLEAN NOT NULL DEFAULT false,
+  "joinedAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY ("roomId", "userId"),
+  FOREIGN KEY ("roomId") REFERENCES chat_rooms(id) ON DELETE CASCADE,
+  FOREIGN KEY ("userId") REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- 1.5 메시지 테이블
+CREATE TABLE IF NOT EXISTS messages (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  "roomId" UUID NOT NULL,
+  "userId" UUID NOT NULL,
+  content TEXT NOT NULL,
+  type VARCHAR(20) NOT NULL DEFAULT 'text' CHECK (type IN ('text', 'image', 'video', 'file')),
+  "fileUrl" VARCHAR(500),
+  "fileName" VARCHAR(255),
+  "fileSize" INTEGER,
+  timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY ("roomId") REFERENCES chat_rooms(id) ON DELETE CASCADE,
+  FOREIGN KEY ("userId") REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- ========================================
+-- 2. 인덱스 생성 (성능 최적화)
+-- ========================================
+
+-- 2.1 users 인덱스
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE INDEX IF NOT EXISTS idx_users_lastlogin ON users("lastLoginAt");
+
+-- 2.2 email_verifications 인덱스
+CREATE UNIQUE INDEX IF NOT EXISTS idx_ev_token ON email_verifications(token);
+CREATE INDEX IF NOT EXISTS idx_ev_email ON email_verifications(email);
+CREATE INDEX IF NOT EXISTS idx_ev_expires ON email_verifications("expiresAt") WHERE "isVerified" = false;
+
+-- 2.3 chat_rooms 인덱스 (최적화)
+CREATE INDEX IF NOT EXISTS idx_chat_rooms_last_at ON chat_rooms("lastMessageAt" DESC NULLS LAST);
+CREATE INDEX IF NOT EXISTS idx_chat_rooms_dmkey ON chat_rooms("dmKey") WHERE "dmKey" IS NOT NULL;
+
+-- 2.4 chat_room_participants 인덱스
+CREATE INDEX IF NOT EXISTS idx_crp_user ON chat_room_participants("userId");
+CREATE INDEX IF NOT EXISTS idx_crp_room ON chat_room_participants("roomId");
+CREATE INDEX IF NOT EXISTS idx_crp_lastread ON chat_room_participants("roomId", "lastReadMessageId");
+
+-- 2.5 messages 인덱스 (키셋 페이지네이션)
+CREATE INDEX IF NOT EXISTS idx_messages_room_ts_id ON messages("roomId", "timestamp" DESC, id DESC);
+CREATE INDEX IF NOT EXISTS idx_messages_user_ts ON messages("userId", "timestamp" DESC);
+
+-- ========================================
+-- 3. 트리거 생성 (자동 updatedAt)
+-- ========================================
+
+-- updatedAt 자동 업데이트 함수
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW."updatedAt" = CURRENT_TIMESTAMP;
+  RETURN NEW;
+END;
+$$ language 'plpgsql';
+
+-- users 트리거
+DROP TRIGGER IF EXISTS update_users_updated_at ON users;
+CREATE TRIGGER update_users_updated_at 
+  BEFORE UPDATE ON users 
+  FOR EACH ROW 
+  EXECUTE FUNCTION update_updated_at_column();
+
+-- chat_rooms 트리거
+DROP TRIGGER IF EXISTS update_chat_rooms_updated_at ON chat_rooms;
+CREATE TRIGGER update_chat_rooms_updated_at 
+  BEFORE UPDATE ON chat_rooms 
+  FOR EACH ROW 
+  EXECUTE FUNCTION update_updated_at_column();
+
+-- ========================================
+-- 4. 임시 사용자 데이터 생성 (테스트용)
+-- ========================================
+
+-- 비밀번호: password123 (모든 계정 동일)
+INSERT INTO users (id, name, email, password, phone, birthday, "isActive", "lastLoginAt", "createdAt", "updatedAt")
+VALUES
+  ('e5f3c8a0-1234-4567-89ab-000000000001', '김철수', 'kim@example.com', '$2b$10$rK5qZ.VqQxWJh1YkLGZJK.N8YGZqZ5mJZ5qZ5qZ5qZ5qZ5qZ5qZ5qO', '010-1111-1111', '1990-01-15', true, NOW(), NOW(), NOW()),
+  ('e5f3c8a0-1234-4567-89ab-000000000002', '이영희', 'lee@example.com', '$2b$10$rK5qZ.VqQxWJh1YkLGZJK.N8YGZqZ5mJZ5qZ5qZ5qZ5qZ5qZ5qZ5qO', '010-2222-2222', '1992-03-20', true, NOW(), NOW(), NOW()),
+  ('e5f3c8a0-1234-4567-89ab-000000000003', '박민수', 'park@example.com', '$2b$10$rK5qZ.VqQxWJh1YkLGZJK.N8YGZqZ5mJZ5qZ5qZ5qZ5qZ5qZ5qZ5qO', '010-3333-3333', '1988-07-10', true, NOW(), NOW(), NOW()),
+  ('e5f3c8a0-1234-4567-89ab-000000000004', '정수진', 'jung@example.com', '$2b$10$rK5qZ.VqQxWJh1YkLGZJK.N8YGZqZ5mJZ5qZ5qZ5qZ5qZ5qZ5qZ5qO', '010-4444-4444', '1995-11-25', true, NOW(), NOW(), NOW()),
+  ('e5f3c8a0-1234-4567-89ab-000000000005', '최동현', 'choi@example.com', '$2b$10$rK5qZ.VqQxWJh1YkLGZJK.N8YGZqZ5mJZ5qZ5qZ5qZ5qZ5qZ5qZ5qO', '010-5555-5555', '1991-05-08', true, NOW(), NOW(), NOW()),
+  ('e5f3c8a0-1234-4567-89ab-000000000006', '한지영', 'han@example.com', '$2b$10$rK5qZ.VqQxWJh1YkLGZJK.N8YGZqZ5mJZ5qZ5qZ5qZ5qZ5qZ5qZ5qO', '010-6666-6666', '1993-09-17', true, NOW(), NOW(), NOW()),
+  ('e5f3c8a0-1234-4567-89ab-000000000007', '강민호', 'kang@example.com', '$2b$10$rK5qZ.VqQxWJh1YkLGZJK.N8YGZqZ5mJZ5qZ5qZ5qZ5qZ5qZ5qZ5qO', '010-7777-7777', '1989-12-30', true, NOW(), NOW(), NOW()),
+  ('e5f3c8a0-1234-4567-89ab-000000000008', '윤서연', 'yoon@example.com', '$2b$10$rK5qZ.VqQxWJh1YkLGZJK.N8YGZqZ5mJZ5qZ5qZ5qZ5qZ5qZ5qZ5qO', '010-8888-8888', '1994-04-22', true, NOW(), NOW(), NOW()),
+  ('e5f3c8a0-1234-4567-89ab-000000000009', '조현우', 'jo@example.com', '$2b$10$rK5qZ.VqQxWJh1YkLGZJK.N8YGZqZ5mJZ5qZ5qZ5qZ5qZ5qZ5qZ5qO', '010-9999-9999', '1987-06-14', true, NOW(), NOW(), NOW()),
+  ('e5f3c8a0-1234-4567-89ab-000000000010', '임수빈', 'lim@example.com', '$2b$10$rK5qZ.VqQxWJh1YkLGZJK.N8YGZqZ5mJZ5qZ5qZ5qZ5qZ5qZ5qZ5qO', '010-1010-1010', '1996-08-05', true, NOW(), NOW(), NOW())
+ON CONFLICT (email) DO NOTHING;
+
+-- ========================================
+-- 5. 통계 및 확인
+-- ========================================
+
+-- 테이블 통계
+ANALYZE users;
+ANALYZE email_verifications;
+ANALYZE chat_rooms;
+ANALYZE chat_room_participants;
+ANALYZE messages;
+
+-- 확인 쿼리
+SELECT 
+  'users' as table_name, COUNT(*) as count FROM users
+UNION ALL
+SELECT 'chat_rooms', COUNT(*) FROM chat_rooms
+UNION ALL
+SELECT 'chat_room_participants', COUNT(*) FROM chat_room_participants
+UNION ALL
+SELECT 'messages', COUNT(*) FROM messages
+ORDER BY table_name;
+
+-- 인덱스 확인
+SELECT 
+  tablename,
+  indexname,
+  indexdef
+FROM pg_indexes
+WHERE schemaname = 'public'
+  AND tablename IN ('users', 'chat_rooms', 'chat_room_participants', 'messages')
+ORDER BY tablename, indexname;
+
+-- ========================================
+-- 완료 메시지
+-- ========================================
+SELECT '✅ SuChat 데이터베이스 초기화 완료!' as status;
+SELECT '📊 테스트 계정: kim@example.com / password123' as info;
+SELECT '🚀 백엔드를 재시작하세요: npm run start:dev' as next_step;
+

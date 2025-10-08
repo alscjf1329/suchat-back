@@ -28,12 +28,20 @@ docker-compose ps
 
 echo
 echo "📝 환경 설정 (.env 파일):"
+
+# docker-compose.yml에서 설정 읽기
+DB_DATABASE=$(grep -A 10 "postgres:" docker-compose.yml | grep "POSTGRES_DB:" | cut -d' ' -f6- | tr -d ' ')
+DB_PORT=$(grep -A 10 "postgres:" docker-compose.yml | grep "ports:" -A 1 | grep -o '[0-9]*:5432' | cut -d':' -f1)
+DB_USERNAME=$(grep -A 10 "postgres:" docker-compose.yml | grep "POSTGRES_USER:" | cut -d' ' -f6- | tr -d ' ')
+DB_PASSWORD=$(grep -A 10 "postgres:" docker-compose.yml | grep "POSTGRES_PASSWORD:" | cut -d' ' -f6- | tr -d ' ')
+REDIS_PORT=$(grep -A 10 "redis:" docker-compose.yml | grep "ports:" -A 1 | grep -o '[0-9]*:6379' | cut -d':' -f1)
+
 echo "  DB_HOST=localhost"
-echo "  DB_PORT=5432"
-echo "  DB_USERNAME=postgres"
-echo "  DB_PASSWORD=postgres123"
-echo "  DB_DATABASE=suchat"
+echo "  DB_PORT=${DB_PORT:-5432}"
+echo "  DB_USERNAME=${DB_USERNAME:-postgres}"
+echo "  DB_PASSWORD=${DB_PASSWORD:-postgres123}"
+echo "  DB_DATABASE=${DB_DATABASE:-suchat}"
 echo "  REDIS_HOST=localhost"
-echo "  REDIS_PORT=6379"
+echo "  REDIS_PORT=${REDIS_PORT:-6379}"
 echo "  USE_MEMORY_DB=false"
 echo

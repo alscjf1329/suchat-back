@@ -1,0 +1,90 @@
+import { Controller, Post, Get, Body, Query, UsePipes, ValidationPipe } from '@nestjs/common';
+import { IsEmail, IsString, IsNotEmpty } from 'class-validator';
+import { EmailVerificationService } from './services/email-verification.service';
+import { EmailService } from './services/email.service';
+
+export class SendVerificationEmailDto {
+  @IsEmail({}, { message: '올바른 이메일 형식이 아닙니다.' })
+  @IsNotEmpty({ message: '이메일을 입력해주세요.' })
+  email: string;
+  
+  @IsString({ message: '이름은 문자열이어야 합니다.' })
+  @IsNotEmpty({ message: '이름을 입력해주세요.' })
+  name: string;
+}
+
+export class ResendVerificationDto {
+  @IsEmail({}, { message: '올바른 이메일 형식이 아닙니다.' })
+  @IsNotEmpty({ message: '이메일을 입력해주세요.' })
+  email: string;
+}
+
+@Controller('auth')
+export class AuthController {
+  constructor(
+    private emailVerificationService: EmailVerificationService,
+    private emailService: EmailService,
+  ) {}
+
+  @Post('send-verification-email')
+  @UsePipes(new ValidationPipe({ transform: true }))
+  async sendVerificationEmail(@Body() body: SendVerificationEmailDto) {
+    try {
+      // 기존 인증 요청이 있는지 확인
+      const existingVerification = await this.emailVerificationService.findByEmail(body.email);
+      
+      if (!existingVerification) {
+        return {
+          success: false,
+          message: '회원가입 요청을 먼저 완료해주세요.',
+        };
+      }
+      
+      // 기존 데이터로 토큰 재생성
+      const token = await this.emailVerificationService.generateVerificationToken(
+        body.email,
+        existingVerification.userData,
+        'signup'
+      );
+
+      // 이메일 발송
+      const emailSent = await this.emailService.sendVerificationEmail(
+        body.email,
+        token,
+        body.name
+      );
+
+      if (!emailSent) {
+        return {
+          success: false,
+          message: '이메일 발송에 실패했습니다.',
+        };
+      }
+
+      return {
+        success: true,
+        message: '인증 이메일이 발송되었습니다.',
+      };
+    } catch (error) {
+      console.error('이메일 발송 에러:', error);
+      return {
+        success: false,
+        message: '이메일 발송 중 오류가 발생했습니다.',
+      };
+    }
+  }
+
+  @Post('verify-email')
+  @UsePipes(new ValidationPipe({ transform: true }))
+  async verifyEmail(@Body() body: { token: string }) {
+    const result = await this.emailVerificationService.verifyEmail(body.token);
+    return result;
+  }
+
+  @Post('resend-verification')
+  @UsePipes(new ValidationPipe({ transform: true }))
+  async resendVerification(@Body() body: ResendVerificationDto) {
+    const result = await this.emailVerificationService.resendVerificationEmail(body.email);
+    return result;
+  }
+}
