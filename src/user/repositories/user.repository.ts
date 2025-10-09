@@ -10,6 +10,7 @@ export interface IUserRepository {
   findAll(): Promise<User[]>;
   update(id: string, userData: Partial<User>): Promise<User>;
   delete(id: string): Promise<boolean>;
+  searchUsers(query: string, limit?: number, offset?: number): Promise<{ users: User[]; total: number }>;
 }
 
 @Injectable()
@@ -51,6 +52,28 @@ export class PostgresUserRepository implements IUserRepository {
   async delete(id: string): Promise<boolean> {
     const result = await this.userRepository.delete(id);
     return (result.affected ?? 0) > 0;
+  }
+
+  async searchUsers(
+    query: string,
+    limit: number = 20,
+    offset: number = 0,
+  ): Promise<{ users: User[]; total: number }> {
+    console.log(`[PostgresUserRepository] 검색 쿼리: "${query}"`);
+    
+    const queryBuilder = this.userRepository
+      .createQueryBuilder('user')
+      .where('LOWER(user.name) LIKE LOWER(:query)', { query: `%${query}%` })
+      .orWhere('LOWER(user.email) LIKE LOWER(:query)', { query: `%${query}%` })
+      .orderBy('user.name', 'ASC')
+      .skip(offset)
+      .take(limit);
+
+    const [users, total] = await queryBuilder.getManyAndCount();
+
+    console.log(`[PostgresUserRepository] 결과: ${total}명 (${users.map(u => u.email).join(', ')})`);
+
+    return { users, total };
   }
 }
 
@@ -107,6 +130,23 @@ export class MemoryUserRepository implements IUserRepository {
     
     this.users.splice(userIndex, 1);
     return true;
+  }
+
+  async searchUsers(
+    query: string,
+    limit: number = 20,
+    offset: number = 0,
+  ): Promise<{ users: User[]; total: number }> {
+    const lowerQuery = query.toLowerCase();
+    const filtered = this.users.filter(user => 
+      user.name.toLowerCase().includes(lowerQuery) ||
+      user.email.toLowerCase().includes(lowerQuery)
+    ).sort((a, b) => a.name.localeCompare(b.name));
+
+    const total = filtered.length;
+    const users = filtered.slice(offset, offset + limit);
+
+    return { users, total };
   }
 
   private generateId(): string {

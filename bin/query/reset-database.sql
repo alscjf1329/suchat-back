@@ -14,6 +14,8 @@
 DROP TABLE IF EXISTS messages CASCADE;
 DROP TABLE IF EXISTS chat_room_participants CASCADE;
 DROP TABLE IF EXISTS chat_rooms CASCADE;
+DROP TABLE IF EXISTS friends CASCADE;
+DROP TABLE IF EXISTS refresh_tokens CASCADE;
 DROP TABLE IF EXISTS email_verifications CASCADE;
 DROP TABLE IF EXISTS users CASCADE;
 DROP FUNCTION IF EXISTS update_updated_at_column() CASCADE;
@@ -93,7 +95,29 @@ CREATE TABLE messages (
   FOREIGN KEY ("userId") REFERENCES users(id) ON DELETE CASCADE
 );
 
-SELECT '📊 테이블 재생성 완료' as step_2;
+-- 2.6 친구 관계 테이블
+CREATE TABLE friends (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  "requesterId" UUID NOT NULL,
+  "addresseeId" UUID NOT NULL,
+  status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'accepted', 'rejected')),
+  "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY ("requesterId") REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY ("addresseeId") REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- 2.7 Refresh Token 테이블
+CREATE TABLE refresh_tokens (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  "userId" UUID NOT NULL,
+  token VARCHAR(500) NOT NULL,
+  "expiresAt" TIMESTAMP NOT NULL,
+  "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY ("userId") REFERENCES users(id) ON DELETE CASCADE
+);
+
+SELECT '📊 테이블 재생성 완료 (7개)' as step_2;
 
 -- ========================================
 -- STEP 3: 인덱스 생성
@@ -121,7 +145,18 @@ CREATE INDEX idx_crp_lastread ON chat_room_participants("roomId", "lastReadMessa
 CREATE INDEX idx_messages_room_ts_id ON messages("roomId", "timestamp" DESC, id DESC);
 CREATE INDEX idx_messages_user_ts ON messages("userId", "timestamp" DESC);
 
-SELECT '⚡ 인덱스 생성 완료 (13개)' as step_3;
+-- friends
+CREATE INDEX idx_friends_requester ON friends("requesterId");
+CREATE INDEX idx_friends_addressee ON friends("addresseeId");
+CREATE INDEX idx_friends_status ON friends(status);
+CREATE INDEX idx_friends_pair ON friends("requesterId", "addresseeId");
+
+-- refresh_tokens
+CREATE INDEX idx_refresh_tokens_user ON refresh_tokens("userId");
+CREATE INDEX idx_refresh_tokens_token ON refresh_tokens(token);
+CREATE INDEX idx_refresh_tokens_expires ON refresh_tokens("expiresAt");
+
+SELECT '⚡ 인덱스 생성 완료 (20개)' as step_3;
 
 -- ========================================
 -- STEP 4: 트리거 생성
@@ -178,6 +213,8 @@ ANALYZE email_verifications;
 ANALYZE chat_rooms;
 ANALYZE chat_room_participants;
 ANALYZE messages;
+ANALYZE friends;
+ANALYZE refresh_tokens;
 
 -- ========================================
 -- 최종 확인
@@ -191,6 +228,8 @@ UNION ALL
 SELECT 'chat_room_participants', COUNT(*) FROM chat_room_participants
 UNION ALL
 SELECT 'messages', COUNT(*) FROM messages
+UNION ALL
+SELECT 'friends', COUNT(*) FROM friends
 ORDER BY table_name;
 
 -- ========================================
@@ -198,6 +237,7 @@ ORDER BY table_name;
 -- ========================================
 
 SELECT '🎉 데이터베이스 완전 리셋 완료!' as result;
-SELECT '📊 테이블: 5개, 인덱스: 13개, 사용자: 10명' as summary;
+SELECT '📊 테이블: 7개, 인덱스: 20개, 사용자: 10명' as summary;
+SELECT '🔐 JWT: Access Token 15분, Refresh Token 7일' as jwt_info;
 SELECT '🚀 백엔드 재시작: npm run start:dev' as next_action;
 

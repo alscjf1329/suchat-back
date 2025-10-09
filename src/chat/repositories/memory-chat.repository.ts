@@ -192,6 +192,10 @@ export class MemoryChatRepository implements IChatRepository {
     }).length;
   }
 
+  async findDmRoom(dmKey: string): Promise<ChatRoom | null> {
+    return Array.from(this.rooms.values()).find(r => r.dmKey === dmKey) || null;
+  }
+
   private generateId(): string {
     return Math.random().toString(36).substr(2, 9);
   }

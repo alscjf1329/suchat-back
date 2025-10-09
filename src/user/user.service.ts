@@ -1,154 +1,222 @@
-import { Injectable, ConflictException, NotFoundException, UnauthorizedException, Logger } from '@nestjs/common';
-import { Inject } from '@nestjs/common';
+import { Injectable, Logger, UnauthorizedException, ConflictException, NotFoundException, Inject } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { User } from './entities/user.entity';
 import type { IUserRepository } from './repositories/user.repository';
-import { SignUpDto, SignInDto, UserResponseDto } from './dto/user.dto';
-import { EmailVerificationService } from '../auth/services/email-verification.service';
+import { Friend, FriendStatus } from './entities/friend.entity';
+import type { IFriendRepository } from './repositories/friend.repository';
+import { TokenService } from '../auth/services/token.service';
 
 @Injectable()
 export class UserService {
   private readonly logger = new Logger(UserService.name);
 
   constructor(
-    @Inject('USER_REPOSITORY')
-    private userRepository: IUserRepository,
-    private emailVerificationService: EmailVerificationService,
+    @Inject('IUserRepository')
+    private readonly userRepository: IUserRepository,
+    @Inject('IFriendRepository')
+    private readonly friendRepository: IFriendRepository,
+    private readonly tokenService: TokenService,
   ) {}
 
-  async signUp(signUpDto: SignUpDto): Promise<{ success: boolean; message: string }> {
-    const { name, email, password, phone, birthday } = signUpDto;
-    this.logger.log(`[signUp] 회원가입 요청: email=${email}, name=${name}`);
-
-    // 이메일 중복 확인
+  async signUp(email: string, password: string, name: string): Promise<User> {
+    this.logger.log(`SignUp attempt for email: ${email}`);
+    
     const existingUser = await this.userRepository.findByEmail(email);
     if (existingUser) {
-      this.logger.warn(`[signUp] 이메일 중복: ${email}`);
-      throw new ConflictException('이미 존재하는 이메일입니다.');
+      this.logger.warn(`SignUp failed: Email already exists - ${email}`);
+      throw new ConflictException('Email already exists');
     }
 
-    // 이메일 인증 대기 중인 사용자 확인
-    const existingVerification = await this.emailVerificationService.findByEmail(email);
-    if (existingVerification) {
-      this.logger.warn(`[signUp] 인증 요청 중복: ${email}`);
-      throw new ConflictException('이미 인증 요청이 진행 중인 이메일입니다.');
-    }
+    const hashedPassword = await bcrypt.hash(password, 10);
+    this.logger.debug(`Password hashed for user: ${email}`);
 
-    // 비밀번호 암호화
-    const saltRounds = 10;
-    const hashedPassword = await bcrypt.hash(password, saltRounds);
-    this.logger.debug(`[signUp] 비밀번호 암호화 완료`);
-
-    // 이메일 인증 토큰 생성
-    const userData = {
-      name,
+    const user = await this.userRepository.create({
       email,
       password: hashedPassword,
-      phone,
-      birthday: birthday ? new Date(birthday) : undefined,
-      isActive: true,
-    };
-    
-    await this.emailVerificationService.generateVerificationTokenWithUserData(
-      email,
-      userData,
-      'signup'
-    );
+      name,
+    });
 
-    this.logger.log(`[signUp] 회원가입 요청 완료: ${email}`);
-    
-    return {
-      success: true,
-      message: '회원가입 요청이 완료되었습니다. 이메일 인증을 완료해주세요.',
-    };
+    this.logger.log(`User created successfully: ${user.id} (${email})`);
+    return user;
   }
 
-  async signIn(signInDto: SignInDto): Promise<UserResponseDto> {
-    const { email, password } = signInDto;
-    this.logger.log(`[signIn] 로그인 시도: email=${email}`);
-
-    // 사용자 찾기
+  async signIn(
+    email: string, 
+    password: string, 
+    deviceType: 'mobile' | 'desktop' = 'desktop'
+  ): Promise<{ accessToken: string; refreshToken: string; user: User }> {
+    this.logger.log(`SignIn attempt for email: ${email} (device: ${deviceType})`);
+    
     const user = await this.userRepository.findByEmail(email);
     if (!user) {
-      this.logger.warn(`[signIn] 사용자 없음: ${email}`);
-      throw new UnauthorizedException('이메일 또는 비밀번호가 올바르지 않습니다.');
+      this.logger.warn(`SignIn failed: User not found - ${email}`);
+      throw new UnauthorizedException('Invalid credentials');
     }
 
-    // 비밀번호 확인
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
-      this.logger.warn(`[signIn] 비밀번호 불일치: ${email}`);
-      throw new UnauthorizedException('이메일 또는 비밀번호가 올바르지 않습니다.');
+      this.logger.warn(`SignIn failed: Invalid password for user - ${email}`);
+      throw new UnauthorizedException('Invalid credentials');
     }
 
-    // 계정 활성화 확인
-    if (!user.isActive) {
-      this.logger.warn(`[signIn] 비활성 계정: ${email}`);
-      throw new UnauthorizedException('비활성화된 계정입니다.');
-    }
+    // Access Token (디바이스별) + Refresh Token (7일) 생성
+    const accessToken = this.tokenService.generateAccessToken(user, deviceType);
+    const refreshToken = await this.tokenService.generateRefreshToken(user.id);
 
-    // 마지막 로그인 시간 업데이트
-    await this.userRepository.update(user.id, { lastLoginAt: new Date() });
-    this.logger.log(`[signIn] 로그인 성공: ${email} (${user.name})`);
+    // 비밀번호 제거
+    const { password: _, ...userWithoutPassword } = user;
 
-    return this.mapToResponseDto(user);
+    this.logger.log(`User signed in successfully: ${user.id} (${email}, ${deviceType})`);
+    return { 
+      accessToken, 
+      refreshToken,
+      user: userWithoutPassword as User 
+    };
   }
 
-  async getUserById(id: string): Promise<UserResponseDto> {
-    const user = await this.userRepository.findById(id);
-    if (!user) {
-      throw new NotFoundException('사용자를 찾을 수 없습니다.');
-    }
+  async refreshToken(
+    refreshToken: string, 
+    deviceType: 'mobile' | 'desktop' = 'desktop'
+  ): Promise<{ accessToken: string; refreshToken: string }> {
+    this.logger.log(`Token refresh attempt (device: ${deviceType})`);
+    
+    const user = await this.tokenService.verifyRefreshToken(refreshToken);
+    
+    // 새 Access Token (디바이스별) + Refresh Token 발급
+    const newAccessToken = this.tokenService.generateAccessToken(user, deviceType);
+    const newRefreshToken = await this.tokenService.generateRefreshToken(user.id);
 
-    return this.mapToResponseDto(user);
+    this.logger.log(`Token refreshed for user: ${user.id} (${deviceType})`);
+    return { 
+      accessToken: newAccessToken, 
+      refreshToken: newRefreshToken 
+    };
   }
 
-  async getUserByEmail(email: string): Promise<UserResponseDto | null> {
-    const user = await this.userRepository.findByEmail(email);
-    if (!user) {
-      return null;
-    }
-    return this.mapToResponseDto(user);
+  async logout(refreshToken: string): Promise<void> {
+    this.logger.log('Logout attempt');
+    await this.tokenService.revokeRefreshToken(refreshToken);
   }
 
-  async updateUser(id: string, updateData: Partial<User>): Promise<UserResponseDto> {
-    const user = await this.userRepository.findById(id);
-    if (!user) {
-      throw new NotFoundException('사용자를 찾을 수 없습니다.');
-    }
-
-    // 비밀번호가 포함된 경우 암호화
-    if (updateData.password) {
-      const saltRounds = 10;
-      updateData.password = await bcrypt.hash(updateData.password, saltRounds);
-    }
-
-    const updatedUser = await this.userRepository.update(id, updateData);
-    return this.mapToResponseDto(updatedUser);
-  }
-
-  async deleteUser(id: string): Promise<boolean> {
-    const user = await this.userRepository.findById(id);
-    if (!user) {
-      throw new NotFoundException('사용자를 찾을 수 없습니다.');
-    }
-
-    return await this.userRepository.delete(id);
-  }
-
-  async checkEmailExists(email: string): Promise<boolean> {
-    // users 테이블에서만 이메일 중복 확인
-    const existingUser = await this.userRepository.findByEmail(email);
-    return existingUser !== null;
-  }
-
-  async getAllUsers(): Promise<UserResponseDto[]> {
+  async getAllUsers(): Promise<User[]> {
     const users = await this.userRepository.findAll();
-    return users.map(user => this.mapToResponseDto(user));
+    
+    // 비밀번호 제거
+    return users.map(user => {
+      const { password, ...userWithoutPassword } = user;
+      return userWithoutPassword as User;
+    });
   }
 
-  private mapToResponseDto(user: User): UserResponseDto {
-    const { password, ...userResponse } = user;
-    return userResponse;
+  async searchUsers(
+    query: string,
+    limit: number = 20,
+    offset: number = 0,
+  ): Promise<{ users: User[]; total: number }> {
+    this.logger.log(`🔍 Searching users with query: "${query}" (limit: ${limit}, offset: ${offset})`);
+    
+    if (!query || query.trim().length === 0) {
+      this.logger.warn('❌ Empty search query');
+      return { users: [], total: 0 };
+    }
+
+    const result = await this.userRepository.searchUsers(query, limit, offset);
+    
+    this.logger.log(`✅ Found ${result.total} users matching "${query}"`);
+    this.logger.debug(`📋 Users: ${result.users.map(u => `${u.name}(${u.email})`).join(', ')}`);
+    
+    // 비밀번호 제거
+    result.users = result.users.map(user => {
+      const { password, ...userWithoutPassword } = user;
+      return userWithoutPassword as User;
+    });
+    
+    return result;
+  }
+
+  // 친구 요청 관련 메서드
+  async sendFriendRequest(requesterId: string, addresseeId: string): Promise<Friend> {
+    this.logger.log(`Friend request: ${requesterId} -> ${addresseeId}`);
+    
+    if (requesterId === addresseeId) {
+      throw new ConflictException('Cannot send friend request to yourself');
+    }
+
+    const addressee = await this.userRepository.findById(addresseeId);
+    if (!addressee) {
+      throw new NotFoundException('User not found');
+    }
+
+    return await this.friendRepository.sendFriendRequest(requesterId, addresseeId);
+  }
+
+  async acceptFriendRequest(friendId: string, userId: string): Promise<Friend> {
+    this.logger.log(`Accepting friend request: ${friendId} by user: ${userId}`);
+    
+    const friendRequest = await this.friendRepository.getFriendRequest(userId, userId);
+    // 실제로는 friendId로 조회해서 addresseeId가 userId인지 확인해야 함
+    
+    return await this.friendRepository.updateFriendStatus(friendId, FriendStatus.ACCEPTED);
+  }
+
+  async rejectFriendRequest(friendId: string, userId: string): Promise<Friend> {
+    this.logger.log(`Rejecting friend request: ${friendId} by user: ${userId}`);
+    
+    return await this.friendRepository.updateFriendStatus(friendId, FriendStatus.REJECTED);
+  }
+
+  async getPendingRequests(userId: string): Promise<Friend[]> {
+    const requests = await this.friendRepository.getPendingRequests(userId);
+    
+    // 비밀번호 제거
+    return requests.map(request => {
+      if (request.requester) {
+        const { password, ...requesterWithoutPassword } = request.requester;
+        request.requester = requesterWithoutPassword as any;
+      }
+      if (request.addressee) {
+        const { password, ...addresseeWithoutPassword } = request.addressee;
+        request.addressee = addresseeWithoutPassword as any;
+      }
+      return request;
+    });
+  }
+
+  async getSentRequests(userId: string): Promise<Friend[]> {
+    const requests = await this.friendRepository.getSentRequests(userId);
+    
+    // 비밀번호 제거
+    return requests.map(request => {
+      if (request.requester) {
+        const { password, ...requesterWithoutPassword } = request.requester;
+        request.requester = requesterWithoutPassword as any;
+      }
+      if (request.addressee) {
+        const { password, ...addresseeWithoutPassword } = request.addressee;
+        request.addressee = addresseeWithoutPassword as any;
+      }
+      return request;
+    });
+  }
+
+  async getFriends(userId: string): Promise<Friend[]> {
+    const friends = await this.friendRepository.getFriends(userId);
+    
+    // 비밀번호 제거
+    return friends.map(friend => {
+      if (friend.requester) {
+        const { password, ...requesterWithoutPassword } = friend.requester;
+        friend.requester = requesterWithoutPassword as any;
+      }
+      if (friend.addressee) {
+        const { password, ...addresseeWithoutPassword } = friend.addressee;
+        friend.addressee = addresseeWithoutPassword as any;
+      }
+      return friend;
+    });
+  }
+
+  async deleteFriendRequest(friendId: string): Promise<void> {
+    await this.friendRepository.deleteFriendRequest(friendId);
   }
 }

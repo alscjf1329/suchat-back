@@ -211,4 +211,21 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.logger.debug(`[get_user_rooms] 안읽음 개수 계산 완료`);
     return roomsWithUnread;
   }
+
+  @SubscribeMessage('get_or_create_dm')
+  async handleGetOrCreateDm(
+    @MessageBody() data: { userId1: string; userId2: string; userName1: string; userName2: string },
+  ) {
+    this.logger.log(`[get_or_create_dm] DM 조회/생성: ${data.userId1} <-> ${data.userId2}`);
+    
+    const room = await this.chatService.getOrCreateDmRoom(
+      data.userId1,
+      data.userId2,
+      data.userName1,
+      data.userName2,
+    );
+
+    this.logger.log(`[get_or_create_dm] DM 준비 완료: roomId=${room.id}`);
+    return room;
+  }
 }

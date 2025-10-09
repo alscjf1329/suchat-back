@@ -1,130 +1,145 @@
-import { Controller, Post, Get, Put, Delete, Body, Param, ValidationPipe, UsePipes } from '@nestjs/common';
-import { IsEmail, IsNotEmpty } from 'class-validator';
+import { Controller, Post, Get, Body, Param, Delete, Put, UseGuards, Request, Query } from '@nestjs/common';
 import { UserService } from './user.service';
-import { SignUpDto, SignInDto, UserResponseDto } from './dto/user.dto';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
-export class CheckEmailDto {
-  @IsEmail({}, { message: '올바른 이메일 형식이 아닙니다.' })
-  @IsNotEmpty({ message: '이메일을 입력해주세요.' })
-  email: string;
-}
-
-@Controller('auth')
+@Controller('api')
 export class UserController {
-  constructor(
-    private readonly userService: UserService,
-  ) {}
+  constructor(private readonly userService: UserService) {}
 
   @Post('signup')
-  @UsePipes(new ValidationPipe({ transform: true }))
-  async signUp(@Body() signUpDto: SignUpDto): Promise<{
-    success: boolean;
-    message: string;
-  }> {
-    try {
-      const result = await this.userService.signUp(signUpDto);
-      
-      return result;
-    } catch (error) {
-      throw error;
-    }
+  async signUp(
+    @Body('email') email: string,
+    @Body('password') password: string,
+    @Body('name') name: string,
+  ) {
+    const user = await this.userService.signUp(email, password, name);
+    return { success: true, data: user };
   }
 
   @Post('signin')
-  @UsePipes(new ValidationPipe({ transform: true }))
-  async signIn(@Body() signInDto: SignInDto): Promise<{
-    success: boolean;
-    message: string;
-    data: UserResponseDto;
-  }> {
-    try {
-      const user = await this.userService.signIn(signInDto);
-      
-      return {
-        success: true,
-        message: '로그인이 완료되었습니다.',
-        data: user,
-      };
-    } catch (error) {
-      throw error;
-    }
+  async signIn(
+    @Body('email') email: string,
+    @Body('password') password: string,
+    @Body('deviceType') deviceType?: 'mobile' | 'desktop',
+  ) {
+    const result = await this.userService.signIn(email, password, deviceType || 'desktop');
+    return { success: true, data: result };
   }
 
-  @Get('user/:id')
-  async getUserById(@Param('id') id: string): Promise<{
-    success: boolean;
-    data: UserResponseDto;
-  }> {
-    const user = await this.userService.getUserById(id);
-    
-    return {
-      success: true,
-      data: user,
-    };
+  @Post('refresh')
+  async refreshToken(
+    @Body('refreshToken') refreshToken: string,
+    @Body('deviceType') deviceType?: 'mobile' | 'desktop',
+  ) {
+    const result = await this.userService.refreshToken(refreshToken, deviceType || 'desktop');
+    return { success: true, data: result };
   }
 
-  @Put('user/:id')
-  @UsePipes(new ValidationPipe({ transform: true }))
-  async updateUser(
-    @Param('id') id: string,
-    @Body() updateData: Partial<SignUpDto>,
-  ): Promise<{
-    success: boolean;
-    message: string;
-    data: UserResponseDto;
-  }> {
-    // birthday 문자열을 Date로 변환
-    const processedData = {
-      ...updateData,
-      birthday: updateData.birthday ? new Date(updateData.birthday) : undefined,
-    };
-    
-    const user = await this.userService.updateUser(id, processedData);
-    
-    return {
-      success: true,
-      message: '사용자 정보가 업데이트되었습니다.',
-      data: user,
-    };
-  }
-
-  @Delete('user/:id')
-  async deleteUser(@Param('id') id: string): Promise<{
-    success: boolean;
-    message: string;
-  }> {
-    await this.userService.deleteUser(id);
-    
-    return {
-      success: true,
-      message: '사용자 계정이 삭제되었습니다.',
-    };
-  }
-
-  @Post('check-email')
-  @UsePipes(new ValidationPipe({ transform: true }))
-  async checkEmailExists(@Body() checkEmailDto: CheckEmailDto): Promise<{
-    success: boolean; 
-    data: { exists: boolean };
-  }> {
-    const exists = await this.userService.checkEmailExists(checkEmailDto.email);
-    
-    return {
-      success: true,
-      data: { exists },
-    };
+  @Post('logout')
+  async logout(@Body('refreshToken') refreshToken: string) {
+    await this.userService.logout(refreshToken);
+    return { success: true, message: 'Logged out successfully' };
   }
 
   @Get('users')
-  async getAllUsers(): Promise<{
-    success: boolean;
-    data: UserResponseDto[];
-  }> {
+  async getAllUsers() {
     const users = await this.userService.getAllUsers();
+    return { success: true, data: users };
+  }
+
+  // 유저 검색 (페이지네이션 지원) - 인증 불필요 (친구 찾기용)
+  @Get('users/search')
+  async searchUsers(
+    @Query('q') query: string,
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+  ) {
+    const result = await this.userService.searchUsers(
+      query,
+      limit ? parseInt(limit, 10) : 20,
+      offset ? parseInt(offset, 10) : 0,
+    );
+    return { success: true, data: result };
+  }
+
+  // 친구 요청 보내기
+  @Post('friends/request')
+  async sendFriendRequest(
+    @Body('requesterId') requesterId: string,
+    @Body('addresseeId') addresseeId: string,
+  ) {
+    console.log('📨 친구 요청 받음:', { requesterId, addresseeId });
     
-    return {
-      success: true,
-      data: users,
-    };
+    if (!addresseeId) {
+      return { success: false, message: 'addresseeId is required' };
+    }
+    
+    const friendRequest = await this.userService.sendFriendRequest(
+      requesterId,
+      addresseeId,
+    );
+    return { success: true, data: friendRequest };
+  }
+
+  // 친구 요청 수락
+  @UseGuards(JwtAuthGuard)
+  @Put('friends/:friendId/accept')
+  async acceptFriendRequest(
+    @Request() req,
+    @Param('friendId') friendId: string,
+  ) {
+    const friendRequest = await this.userService.acceptFriendRequest(
+      friendId,
+      req.user.userId,
+    );
+    return { success: true, data: friendRequest };
+  }
+
+  // 친구 요청 거절
+  @UseGuards(JwtAuthGuard)
+  @Put('friends/:friendId/reject')
+  async rejectFriendRequest(
+    @Request() req,
+    @Param('friendId') friendId: string,
+  ) {
+    const friendRequest = await this.userService.rejectFriendRequest(
+      friendId,
+      req.user.userId,
+    );
+    return { success: true, data: friendRequest };
+  }
+
+  // 받은 친구 요청 목록
+  @UseGuards(JwtAuthGuard)
+  @Get('friends/requests/received')
+  async getPendingRequests(@Request() req) {
+    const requests = await this.userService.getPendingRequests(req.user.userId);
+    return { success: true, data: requests };
+  }
+
+  // 보낸 친구 요청 목록
+  @UseGuards(JwtAuthGuard)
+  @Get('friends/requests/sent')
+  async getSentRequests(@Request() req) {
+    const requests = await this.userService.getSentRequests(req.user.userId);
+    return { success: true, data: requests };
+  }
+
+  // 친구 목록
+  @UseGuards(JwtAuthGuard)
+  @Get('friends')
+  async getFriends(@Request() req) {
+    const friends = await this.userService.getFriends(req.user.userId);
+    return { success: true, data: friends };
+  }
+
+  // 친구 요청 삭제 (취소)
+  @UseGuards(JwtAuthGuard)
+  @Delete('friends/:friendId')
+  async deleteFriendRequest(
+    @Param('friendId') friendId: string,
+  ) {
+    await this.userService.deleteFriendRequest(friendId);
+    return { success: true };
   }
 }

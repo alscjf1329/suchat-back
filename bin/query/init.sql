@@ -84,6 +84,28 @@ CREATE TABLE IF NOT EXISTS messages (
   FOREIGN KEY ("userId") REFERENCES users(id) ON DELETE CASCADE
 );
 
+-- 1.6 친구 관계 테이블
+CREATE TABLE IF NOT EXISTS friends (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  "requesterId" UUID NOT NULL,
+  "addresseeId" UUID NOT NULL,
+  status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'accepted', 'rejected')),
+  "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY ("requesterId") REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY ("addresseeId") REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- 1.7 Refresh Token 테이블
+CREATE TABLE IF NOT EXISTS refresh_tokens (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  "userId" UUID NOT NULL,
+  token VARCHAR(500) NOT NULL,
+  "expiresAt" TIMESTAMP NOT NULL,
+  "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY ("userId") REFERENCES users(id) ON DELETE CASCADE
+);
+
 -- ========================================
 -- 2. 인덱스 생성 (성능 최적화)
 -- ========================================
@@ -109,6 +131,17 @@ CREATE INDEX IF NOT EXISTS idx_crp_lastread ON chat_room_participants("roomId", 
 -- 2.5 messages 인덱스 (키셋 페이지네이션)
 CREATE INDEX IF NOT EXISTS idx_messages_room_ts_id ON messages("roomId", "timestamp" DESC, id DESC);
 CREATE INDEX IF NOT EXISTS idx_messages_user_ts ON messages("userId", "timestamp" DESC);
+
+-- 2.6 friends 인덱스 (친구 관계 조회 최적화)
+CREATE INDEX IF NOT EXISTS idx_friends_requester ON friends("requesterId");
+CREATE INDEX IF NOT EXISTS idx_friends_addressee ON friends("addresseeId");
+CREATE INDEX IF NOT EXISTS idx_friends_status ON friends(status);
+CREATE INDEX IF NOT EXISTS idx_friends_pair ON friends("requesterId", "addresseeId");
+
+-- 2.7 refresh_tokens 인덱스 (토큰 갱신 최적화)
+CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user ON refresh_tokens("userId");
+CREATE INDEX IF NOT EXISTS idx_refresh_tokens_token ON refresh_tokens(token);
+CREATE INDEX IF NOT EXISTS idx_refresh_tokens_expires ON refresh_tokens("expiresAt");
 
 -- ========================================
 -- 3. 트리거 생성 (자동 updatedAt)
@@ -166,6 +199,8 @@ ANALYZE email_verifications;
 ANALYZE chat_rooms;
 ANALYZE chat_room_participants;
 ANALYZE messages;
+ANALYZE friends;
+ANALYZE refresh_tokens;
 
 -- 확인 쿼리
 SELECT 
@@ -176,6 +211,8 @@ UNION ALL
 SELECT 'chat_room_participants', COUNT(*) FROM chat_room_participants
 UNION ALL
 SELECT 'messages', COUNT(*) FROM messages
+UNION ALL
+SELECT 'friends', COUNT(*) FROM friends
 ORDER BY table_name;
 
 -- 인덱스 확인
@@ -185,7 +222,7 @@ SELECT
   indexdef
 FROM pg_indexes
 WHERE schemaname = 'public'
-  AND tablename IN ('users', 'chat_rooms', 'chat_room_participants', 'messages')
+  AND tablename IN ('users', 'chat_rooms', 'chat_room_participants', 'messages', 'friends')
 ORDER BY tablename, indexname;
 
 -- ========================================

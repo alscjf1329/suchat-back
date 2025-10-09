@@ -1,15 +1,16 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { UserController } from './user.controller';
 import { UserService } from './user.service';
-import { User } from './entities/user.entity';
+import { User, Friend } from './entities';
 import { PostgresUserRepository, MemoryUserRepository } from './repositories/user.repository';
+import { PostgresFriendRepository } from './repositories/friend.repository';
 import { AuthModule } from '../auth/auth.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User]),
-    AuthModule,
+    TypeOrmModule.forFeature([User, Friend]),
+    forwardRef(() => AuthModule),
   ],
   controllers: [UserController],
   providers: [
@@ -19,6 +20,16 @@ import { AuthModule } from '../auth/auth.module';
       useClass: process.env.USE_MEMORY_DB === 'true' 
         ? MemoryUserRepository 
         : PostgresUserRepository,
+    },
+    {
+      provide: 'IUserRepository',
+      useClass: process.env.USE_MEMORY_DB === 'true' 
+        ? MemoryUserRepository 
+        : PostgresUserRepository,
+    },
+    {
+      provide: 'IFriendRepository',
+      useClass: PostgresFriendRepository,
     },
   ],
   exports: [UserService, 'USER_REPOSITORY'],
