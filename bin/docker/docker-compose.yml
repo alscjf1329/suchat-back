@@ -8,6 +8,9 @@ services:
       POSTGRES_DB: suchat
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres123
+      TZ: Asia/Seoul
+      PGTZ: Asia/Seoul
+    command: postgres -c timezone=Asia/Seoul
     ports:
       - "5432:5432"
     volumes:
@@ -23,6 +26,8 @@ services:
   redis:
     image: redis:7-alpine
     container_name: suchat-redis
+    environment:
+      TZ: Asia/Seoul
     ports:
       - "6379:6379"
     volumes:

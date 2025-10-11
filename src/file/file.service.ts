@@ -28,10 +28,14 @@ export class FileService {
       },
     });
 
+    // Wait for job to complete
+    const result = await job.finished();
+
     return {
       jobId: job.id,
       fileId: fileData.fileId,
-      status: 'processing',
+      status: 'completed',
+      result,
     };
   }
 

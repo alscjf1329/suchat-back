@@ -19,6 +19,22 @@ export class ResendVerificationDto {
   email: string;
 }
 
+export class ForgotPasswordDto {
+  @IsEmail({}, { message: '올바른 이메일 형식이 아닙니다.' })
+  @IsNotEmpty({ message: '이메일을 입력해주세요.' })
+  email: string;
+}
+
+export class ResetPasswordDto {
+  @IsString({ message: '토큰은 문자열이어야 합니다.' })
+  @IsNotEmpty({ message: '토큰을 입력해주세요.' })
+  token: string;
+
+  @IsString({ message: '비밀번호는 문자열이어야 합니다.' })
+  @IsNotEmpty({ message: '새 비밀번호를 입력해주세요.' })
+  newPassword: string;
+}
+
 @Controller('auth')
 export class AuthController {
   constructor(
@@ -86,5 +102,35 @@ export class AuthController {
   async resendVerification(@Body() body: ResendVerificationDto) {
     const result = await this.emailVerificationService.resendVerificationEmail(body.email);
     return result;
+  }
+
+  @Post('forgot-password')
+  @UsePipes(new ValidationPipe({ transform: true }))
+  async forgotPassword(@Body() body: ForgotPasswordDto) {
+    try {
+      const result = await this.emailVerificationService.sendPasswordResetEmail(body.email);
+      return result;
+    } catch (error) {
+      console.error('비밀번호 재설정 이메일 발송 에러:', error);
+      return {
+        success: false,
+        message: '이메일 발송 중 오류가 발생했습니다.',
+      };
+    }
+  }
+
+  @Post('reset-password')
+  @UsePipes(new ValidationPipe({ transform: true }))
+  async resetPassword(@Body() body: ResetPasswordDto) {
+    try {
+      const result = await this.emailVerificationService.resetPassword(body.token, body.newPassword);
+      return result;
+    } catch (error) {
+      console.error('비밀번호 재설정 에러:', error);
+      return {
+        success: false,
+        message: '비밀번호 재설정 중 오류가 발생했습니다.',
+      };
+    }
   }
 }

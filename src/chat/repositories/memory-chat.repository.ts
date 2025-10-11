@@ -199,4 +199,16 @@ export class MemoryChatRepository implements IChatRepository {
   private generateId(): string {
     return Math.random().toString(36).substr(2, 9);
   }
+
+  async getRoomParticipants(roomId: string): Promise<any[]> {
+    const room = Array.from(this.rooms.values()).find(r => r.id === roomId);
+    if (!room) return [];
+    
+    // 메모리 DB용 간단한 구현 (participants 배열을 변환)
+    return room.participants.map(userId => ({
+      roomId,
+      userId,
+      role: 'member',
+    }));
+  }
 }

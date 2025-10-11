@@ -2,14 +2,14 @@
 
 데이터베이스 관리를 위한 SQL 스크립트 모음입니다.
 
-## 📄 파일 목록 (총 3개)
+## 📄 파일 목록 (총 3개 + 마이그레이션 5개)
 
 ### 1. `init.sql` - 초기화 🟢
 **용도**: 데이터베이스 전체 초기화
 
 **포함 내용:**
-- ✅ 모든 테이블 생성 (6개)
-- ✅ 인덱스 생성 (17개)
+- ✅ 모든 테이블 생성 (8개)
+- ✅ 인덱스 생성 (20개+)
 - ✅ 트리거 설정
 - ✅ 테스트 데이터 (사용자 10명)
 
@@ -142,13 +142,16 @@
 - users
 - email_verifications
 - chat_rooms
-- chat_room_participants (신규)
+- chat_room_participants
 - messages
-- friends (신규 - 친구 관계 관리)
+- friends
+- refresh_tokens
+- push_subscriptions (신규 - PWA 푸시 알림)
 
-### 인덱스 (총 17개)
+### 인덱스 (총 20개+)
 - 성능 최적화를 위한 인덱스 자동 생성
 - 친구 조회 최적화 인덱스 포함
+- 푸시 구독 조회 최적화 인덱스 포함
 
 ---
 
@@ -167,8 +170,32 @@ pgAdmin에서 debug-queries.sql의 필요한 부분만 실행
 
 ---
 
-**작성일**: 2025-10-08  
-**버전**: 2.0.0  
+## 📂 마이그레이션 (migrations/)
+
+### 001, 002 - 기본 스키마
+- 채팅방 최적화
+- 친구 시스템
+
+### 003 - 푸시 알림 구독 테이블 추가
+```bash
+Get-Content bin/query/migrations/003_add_push_subscriptions.sql | docker compose -f bin/docker/docker-compose.yml exec -T postgres psql -U postgres -d suchat
+```
+
+### 004 - userAgent 길이 확장 (100 → 500)
+```bash
+Get-Content bin/query/migrations/004_extend_push_useragent.sql | docker compose -f bin/docker/docker-compose.yml exec -T postgres psql -U postgres -d suchat
+```
+
+### 005 - userId UNIQUE 제약조건
+```bash
+Get-Content bin/query/migrations/005_push_userid_unique.sql | docker compose -f bin/docker/docker-compose.yml exec -T postgres psql -U postgres -d suchat
+```
+
+---
+
+**작성일**: 2025-10-11  
+**버전**: 3.0.0  
 **데이터베이스**: PostgreSQL 15  
-**파일 개수**: 3개 (11개 → 3개로 단순화)
+**쿼리 파일**: 3개  
+**마이그레이션**: 5개
 

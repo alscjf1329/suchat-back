@@ -25,7 +25,9 @@ export class TokenService {
     
     this.logger.debug(`Access Token 생성: ${user.email} (${deviceType}, ${expiresIn})`);
     
-    return this.jwtService.sign(payload, { expiresIn });
+    const token = this.jwtService.sign(payload, { expiresIn });
+    
+    return token;
   }
 
   // Refresh Token 생성 및 저장 (7일)

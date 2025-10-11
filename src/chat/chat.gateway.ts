@@ -10,6 +10,7 @@ import {
 import { Logger } from '@nestjs/common';
 import { Server, Socket } from 'socket.io';
 import { ChatService } from './chat.service';
+import { PushService } from '../push/push.service';
 import { randomUUID } from 'crypto';
 
 @WebSocketGateway({
@@ -23,7 +24,10 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
   server: Server;
 
-  constructor(private readonly chatService: ChatService) {}
+  constructor(
+    private readonly chatService: ChatService,
+    private readonly pushService: PushService,
+  ) {}
 
   handleConnection(client: Socket) {
     this.logger.log(`[WS] 클라이언트 연결: ${client.id}`);
@@ -145,7 +149,60 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.server.to(data.roomId).emit('new_message', message);
     this.logger.debug(`[send_message] 브로드캐스트 완료: messageId=${message.id}`);
     
+    // 푸시 알림 발송 (오프라인 사용자에게)
+    await this.sendPushNotifications(data.roomId, data.userId, message);
+    
     return message;
+  }
+
+  /**
+   * 채팅방 참여자에게 푸시 알림 발송
+   */
+  private async sendPushNotifications(roomId: string, senderId: string, message: any) {
+    try {
+      const room = await this.chatService.getRoom(roomId);
+      if (!room) return;
+
+      // 채팅방의 모든 참여자 조회
+      const participants = await this.chatService.getRoomParticipants(roomId);
+      
+      // 소켓에 연결된 사용자 ID 추출
+      const connectedUserIds = Array.from(this.server.sockets.sockets.values())
+        .map((socket) => (socket as any).userId)
+        .filter(Boolean);
+
+      // 발신자를 제외한 오프라인 참여자에게만 푸시
+      const offlineParticipants = participants
+        .filter((p) => p.userId !== senderId) // 발신자 제외
+        .filter((p) => !connectedUserIds.includes(p.userId)); // 오프라인만
+
+      this.logger.debug(
+        `[push] 오프라인 참여자: ${offlineParticipants.length}명 (전체: ${participants.length}명, 온라인: ${connectedUserIds.length}명)`,
+      );
+
+      // 각 오프라인 사용자에게 푸시 알림 큐 추가
+      for (const participant of offlineParticipants) {
+        await this.pushService.sendPushNotification({
+          userId: participant.userId,
+          title: room.name || '새 메시지',
+          body: message.type === 'text' 
+            ? message.content 
+            : `${message.type === 'image' ? '📷 사진' : message.type === 'video' ? '🎥 동영상' : '📎 파일'}을 보냈습니다`,
+          icon: '/icons/icon-192x192.svg',
+          badge: '/icons/icon-192x192.svg',
+          data: {
+            roomId,
+            messageId: message.id,
+            type: 'chat_message',
+          },
+          tag: `room-${roomId}`, // 같은 방의 알림은 덮어쓰기
+        });
+      }
+
+      this.logger.log(`[push] 푸시 알림 큐 추가 완료: ${offlineParticipants.length}명`);
+    } catch (error) {
+      this.logger.error(`[push] 푸시 알림 발송 실패: ${error.message}`, error.stack);
+    }
   }
 
   @SubscribeMessage('create_room')

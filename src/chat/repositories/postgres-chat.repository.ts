@@ -15,6 +15,7 @@ export interface IChatRepository {
   updateLastRead(roomId: string, userId: string, messageId: string): Promise<boolean>;
   getUnreadCount(roomId: string, userId: string): Promise<number>;
   findDmRoom(dmKey: string): Promise<ChatRoom | null>;
+  getRoomParticipants(roomId: string): Promise<ChatRoomParticipant[]>;
 }
 
 @Injectable()
@@ -238,5 +239,16 @@ export class PostgresChatRepository implements IChatRepository {
     }
 
     return room;
+  }
+
+  async getRoomParticipants(roomId: string): Promise<ChatRoomParticipant[]> {
+    this.logger.debug(`[getRoomParticipants] 참여자 조회: roomId=${roomId}`);
+    
+    const participants = await this.participantRepository.find({
+      where: { roomId }
+    });
+
+    this.logger.log(`[getRoomParticipants] 참여자 ${participants.length}명 조회됨`);
+    return participants;
   }
 }

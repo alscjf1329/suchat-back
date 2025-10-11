@@ -72,4 +72,8 @@ export class ChatService {
 
     return room;
   }
+
+  async getRoomParticipants(roomId: string) {
+    return await this.chatRepository.getRoomParticipants(roomId);
+  }
 }

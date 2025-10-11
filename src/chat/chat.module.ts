@@ -5,10 +5,12 @@ import { ChatService } from './chat.service';
 import { PostgresChatRepository } from './repositories/postgres-chat.repository';
 import { MemoryChatRepository } from './repositories/memory-chat.repository';
 import { ChatRoom, Message, ChatRoomParticipant } from './entities';
+import { PushModule } from '../push/push.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([ChatRoom, Message, ChatRoomParticipant]),
+    PushModule,
   ],
   providers: [
     ChatGateway,

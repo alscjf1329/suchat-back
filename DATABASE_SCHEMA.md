@@ -5,7 +5,8 @@
 2. [email_verifications (이메일 인증)](#2-email_verifications-이메일-인증)
 3. [chat_rooms (채팅방)](#3-chat_rooms-채팅방)
 4. [messages (메시지)](#4-messages-메시지)
-5. [관계도](#5-관계도)
+5. [push_subscriptions (푸시 알림 구독)](#5-push_subscriptions-푸시-알림-구독)
+6. [관계도](#6-관계도)
 
 ---
 
@@ -269,7 +270,85 @@ GROUP BY type;
 
 ---
 
-## 5. 관계도
+## 5. push_subscriptions (푸시 알림 구독)
+
+### 📝 설명
+PWA 푸시 알림을 위한 구독 정보를 저장하는 테이블입니다. 사용자별로 하나의 구독만 유지하며, 새로운 디바이스에서 구독하면 기존 구독이 업데이트됩니다.
+
+### 🗂️ 컬럼 정보
+
+| 컬럼명 | 타입 | 제약조건 | 기본값 | 설명 |
+|--------|------|----------|--------|------|
+| `id` | UUID | PRIMARY KEY | auto-generated | 구독 고유 ID |
+| `userId` | UUID | NOT NULL, UNIQUE, FOREIGN KEY, INDEX | - | 사용자 ID (users 참조) |
+| `endpoint` | TEXT | NOT NULL | - | 푸시 서버 엔드포인트 URL |
+| `p256dh` | VARCHAR(255) | NOT NULL | - | 암호화 공개키 |
+| `auth` | VARCHAR(255) | NOT NULL | - | 인증 시크릿 |
+| `userAgent` | VARCHAR(500) | NULLABLE | null | 브라우저/디바이스 정보 |
+| `isActive` | BOOLEAN | NOT NULL | true | 활성화 상태 |
+| `createdAt` | TIMESTAMP | NOT NULL | CURRENT_TIMESTAMP | 생성 시간 |
+| `updatedAt` | TIMESTAMP | NOT NULL | CURRENT_TIMESTAMP | 수정 시간 |
+
+### 🔗 관계
+- `OneToOne` → **users** (구독한 사용자)
+
+### 📌 인덱스
+- `userId` (UNIQUE - 사용자당 하나의 구독만 허용)
+- `isActive` (활성 구독 조회 최적화)
+
+### 💡 비즈니스 로직
+- **사용자별로 하나의 구독만 유지** (UPSERT 방식)
+- 새로운 디바이스에서 구독하면 기존 구독이 최신 정보로 업데이트됨
+- endpoint는 브라우저별로 고유하게 생성됨 (FCM URL)
+- isActive = false인 구독은 푸시 전송하지 않음
+- p256dh와 auth는 Web Push Protocol의 VAPID 키
+
+### 📊 예시 데이터
+```sql
+{
+  "id": "sub-uuid-123",
+  "userId": "user-uuid-1",
+  "endpoint": "https://fcm.googleapis.com/fcm/send/abc123...",
+  "p256dh": "BIQMqOdybEjHyCE5jfBcfq6GmwO5C9Bv...",
+  "auth": "IJBVGplY62f88HRgzhGh_A",
+  "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36",
+  "isActive": true,
+  "createdAt": "2025-10-11T10:00:00.000Z",
+  "updatedAt": "2025-10-11T10:00:00.000Z"
+}
+```
+
+### 🔍 주요 쿼리
+```sql
+-- 특정 사용자의 활성 구독 조회
+SELECT * FROM push_subscriptions 
+WHERE "userId" = 'user-uuid' AND "isActive" = true;
+
+-- 만료된 구독 삭제 (정기 작업)
+DELETE FROM push_subscriptions 
+WHERE "updatedAt" < NOW() - INTERVAL '90 days';
+
+-- 전체 활성 구독 수
+SELECT COUNT(*) as active_subscriptions 
+FROM push_subscriptions 
+WHERE "isActive" = true;
+
+-- 구독 UPSERT (새로운 디바이스 구독 또는 업데이트)
+INSERT INTO push_subscriptions ("userId", endpoint, p256dh, auth, "userAgent")
+VALUES ('user-uuid', 'endpoint-url', 'p256dh-key', 'auth-key', 'user-agent')
+ON CONFLICT ("userId") 
+DO UPDATE SET 
+  endpoint = EXCLUDED.endpoint,
+  p256dh = EXCLUDED.p256dh,
+  auth = EXCLUDED.auth,
+  "userAgent" = EXCLUDED."userAgent",
+  "isActive" = true,
+  "updatedAt" = CURRENT_TIMESTAMP;
+```
+
+---
+
+## 6. 관계도
 
 ```
 ┌─────────────────────┐
@@ -320,20 +399,44 @@ GROUP BY type;
 │ • createdAt                 │
 │ • updatedAt                 │
 └─────────────────────────────┘
+
+┌─────────────────────────────┐
+│   push_subscriptions        │
+│   (푸시 알림 구독)          │
+├─────────────────────────────┤
+│ PK: id (UUID)               │
+│ FK: userId                  │
+│ • endpoint (TEXT)           │
+│ • p256dh (VARCHAR 255)      │
+│ • auth (VARCHAR 255)        │
+│ • userAgent (VARCHAR 500)   │
+│ • isActive (BOOLEAN)        │
+│ • createdAt                 │
+│ • updatedAt                 │
+└──────────┬──────────────────┘
+           │ N
+           │
+           │ 1
+           ▼
+   (users 테이블과 연결)
 ```
 
 ---
 
 ## 📈 데이터베이스 통계
 
-### 현재 테이블 개수: **4개**
+### 현재 테이블 개수: **8개**
 
 | 테이블명 | 목적 | 평균 레코드 크기 |
 |----------|------|-----------------|
 | users | 사용자 정보 | ~500 bytes |
 | email_verifications | 임시 인증 데이터 | ~800 bytes |
 | chat_rooms | 채팅방 메타데이터 | ~300 bytes |
+| chat_room_participants | 채팅방 참여자 정보 | ~100 bytes |
 | messages | 채팅 메시지 | ~200-5000 bytes |
+| friends | 친구 관계 | ~100 bytes |
+| refresh_tokens | 리프레시 토큰 | ~600 bytes |
+| push_subscriptions | 푸시 구독 정보 | ~800 bytes |
 
 ---
 

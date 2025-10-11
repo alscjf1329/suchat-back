@@ -106,6 +106,20 @@ CREATE TABLE IF NOT EXISTS refresh_tokens (
   FOREIGN KEY ("userId") REFERENCES users(id) ON DELETE CASCADE
 );
 
+-- 1.8 푸시 알림 구독 테이블
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  "userId" UUID NOT NULL UNIQUE,
+  endpoint TEXT NOT NULL,
+  p256dh VARCHAR(255) NOT NULL,
+  auth VARCHAR(255) NOT NULL,
+  "userAgent" VARCHAR(500),
+  "isActive" BOOLEAN NOT NULL DEFAULT true,
+  "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY ("userId") REFERENCES users(id) ON DELETE CASCADE
+);
+
 -- ========================================
 -- 2. 인덱스 생성 (성능 최적화)
 -- ========================================
@@ -143,6 +157,10 @@ CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user ON refresh_tokens("userId");
 CREATE INDEX IF NOT EXISTS idx_refresh_tokens_token ON refresh_tokens(token);
 CREATE INDEX IF NOT EXISTS idx_refresh_tokens_expires ON refresh_tokens("expiresAt");
 
+-- 2.8 push_subscriptions 인덱스 (푸시 알림 최적화)
+CREATE INDEX IF NOT EXISTS idx_push_subscriptions_user ON push_subscriptions("userId");
+CREATE INDEX IF NOT EXISTS idx_push_subscriptions_active ON push_subscriptions("isActive") WHERE "isActive" = true;
+
 -- ========================================
 -- 3. 트리거 생성 (자동 updatedAt)
 -- ========================================
@@ -167,6 +185,13 @@ CREATE TRIGGER update_users_updated_at
 DROP TRIGGER IF EXISTS update_chat_rooms_updated_at ON chat_rooms;
 CREATE TRIGGER update_chat_rooms_updated_at 
   BEFORE UPDATE ON chat_rooms 
+  FOR EACH ROW 
+  EXECUTE FUNCTION update_updated_at_column();
+
+-- push_subscriptions 트리거
+DROP TRIGGER IF EXISTS update_push_subscriptions_updated_at ON push_subscriptions;
+CREATE TRIGGER update_push_subscriptions_updated_at 
+  BEFORE UPDATE ON push_subscriptions 
   FOR EACH ROW 
   EXECUTE FUNCTION update_updated_at_column();
 
@@ -201,6 +226,7 @@ ANALYZE chat_room_participants;
 ANALYZE messages;
 ANALYZE friends;
 ANALYZE refresh_tokens;
+ANALYZE push_subscriptions;
 
 -- 확인 쿼리
 SELECT 
@@ -213,6 +239,8 @@ UNION ALL
 SELECT 'messages', COUNT(*) FROM messages
 UNION ALL
 SELECT 'friends', COUNT(*) FROM friends
+UNION ALL
+SELECT 'push_subscriptions', COUNT(*) FROM push_subscriptions
 ORDER BY table_name;
 
 -- 인덱스 확인
@@ -222,7 +250,7 @@ SELECT
   indexdef
 FROM pg_indexes
 WHERE schemaname = 'public'
-  AND tablename IN ('users', 'chat_rooms', 'chat_room_participants', 'messages', 'friends')
+  AND tablename IN ('users', 'chat_rooms', 'chat_room_participants', 'messages', 'friends', 'push_subscriptions')
 ORDER BY tablename, indexname;
 
 -- ========================================

@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { AuthController } from './auth.controller';
@@ -17,9 +17,13 @@ import { JwtStrategy } from './jwt.strategy';
     TypeOrmModule.forFeature([EmailVerification, RefreshToken, User]),
     ConfigModule,
     PassportModule,
-    JwtModule.register({
-      secret: process.env.JWT_SECRET || 'your-secret-key',
-      // signOptions는 TokenService에서 디바이스별로 설정
+    JwtModule.registerAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => ({
+        secret: configService.get<string>('JWT_SECRET') || 'your-secret-key',
+        // signOptions는 TokenService에서 디바이스별로 설정
+      }),
     }),
   ],
   controllers: [AuthController],

@@ -65,6 +65,11 @@ export class FileController {
     }
 
     const fileId = this.generateFileId();
+    const fileExtension = extname(file.originalname);
+    
+    // Determine file type
+    const fileType = this.getFileType(file.mimetype);
+    const fileName = `${fileId}${fileExtension}`;
     
     const fileData = {
       fileId,
@@ -79,10 +84,23 @@ export class FileController {
     // Start file processing
     const result = await this.fileService.processFile(fileData);
     
+    // Return immediately usable URL
     return {
       ...result,
+      fileId,
+      fileName,
+      fileType,
+      fileUrl: `/uploads/${fileType}/${fileName}`,
+      originalName: file.originalname,
+      size: file.size,
       message: 'File uploaded successfully, processing...',
     };
+  }
+
+  private getFileType(mimeType: string): string {
+    if (mimeType.startsWith('image/')) return 'images';
+    if (mimeType.startsWith('video/')) return 'videos';
+    return 'docs';
   }
 
   @Get('status/:jobId')
