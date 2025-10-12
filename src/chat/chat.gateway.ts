@@ -45,6 +45,9 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const { roomId, roomName, userId } = data;
     this.logger.log(`[join_room] 사용자 ${userId} 채팅방 참여 시도: ${roomId || roomName}`);
     
+    // 소켓에 userId 저장 (푸시 알림 오프라인 감지용)
+    (client as any).userId = userId;
+    
     let actualRoomId = roomId;
     
     // roomName이 제공된 경우, 기존 방을 찾거나 새로 생성
@@ -188,8 +191,8 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
           body: message.type === 'text' 
             ? message.content 
             : `${message.type === 'image' ? '📷 사진' : message.type === 'video' ? '🎥 동영상' : '📎 파일'}을 보냈습니다`,
-          icon: '/icons/icon-192x192.svg',
-          badge: '/icons/icon-192x192.svg',
+          icon: '/icons/icon-192x192.png',
+          badge: '/icons/icon-192x192.png',
           data: {
             roomId,
             messageId: message.id,

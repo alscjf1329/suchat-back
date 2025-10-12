@@ -8,8 +8,8 @@ export default registerAs('push', () => ({
   },
   // 푸시 알림 기본 설정
   defaults: {
-    icon: '/icons/icon-192x192.svg',
-    badge: '/icons/icon-192x192.svg',
+    icon: '/icons/icon-192x192.png',
+    badge: '/icons/icon-192x192.png',
     ttl: 86400, // 24시간 (초 단위)
   },
 }));

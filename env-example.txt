@@ -28,3 +28,9 @@ EMAIL_USER=your_email@gmail.com
 EMAIL_PASS=your_app_password
 EMAIL_FROM=noreply@suchat.com
 FRONTEND_URL=http://localhost:3001
+
+# Push Notifications (VAPID)
+# Generate VAPID keys using: npx web-push generate-vapid-keys
+VAPID_PUBLIC_KEY=your_vapid_public_key
+VAPID_PRIVATE_KEY=your_vapid_private_key
+VAPID_SUBJECT=mailto:admin@suchat.com
