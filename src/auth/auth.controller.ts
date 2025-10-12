@@ -1,5 +1,6 @@
-import { Controller, Post, Body, forwardRef, Inject } from '@nestjs/common';
+import { Controller, Post, Get, Body, forwardRef, Inject, UseGuards, Request } from '@nestjs/common';
 import { IsEmail, IsString, IsNotEmpty, IsOptional } from 'class-validator';
+import { JwtAuthGuard } from './jwt-auth.guard';
 import { EmailVerificationService } from './services/email-verification.service';
 import { EmailService } from './services/email.service';
 import { UserService } from '../user/user.service';
@@ -96,6 +97,19 @@ export class AuthController {
   async logout(@Body('refreshToken') refreshToken: string) {
     await this.userService.logout(refreshToken);
     return { success: true, message: 'Logged out successfully' };
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('profile')
+  async getProfile(@Request() req: any) {
+    const user = await this.userService.findById(req.user.userId);
+    if (!user) {
+      return { success: false, message: 'User not found' };
+    }
+    
+    // 비밀번호 제거
+    const { password, ...userWithoutPassword } = user;
+    return { success: true, data: userWithoutPassword };
   }
 
   // ============ 이메일 인증 (회원가입) ============

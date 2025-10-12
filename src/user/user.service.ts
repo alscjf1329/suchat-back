@@ -80,6 +80,10 @@ export class UserService {
     return await this.userRepository.findByEmail(email);
   }
 
+  async findById(id: string): Promise<User | null> {
+    return await this.userRepository.findById(id);
+  }
+
   async getAllUsers(): Promise<User[]> {
     const users = await this.userRepository.findAll();
     
