@@ -25,7 +25,13 @@ export class FileProcessor {
       }
       
       // Generate unique filename
-      const fileExtension = path.extname(originalName);
+      let fileExtension = path.extname(originalName);
+      
+      // HEIC/HEIF는 JPEG로 변환되므로 확장자 변경
+      if (fileType === 'images' && this.isHeicFormat(originalName)) {
+        fileExtension = '.jpg';
+      }
+      
       const finalFileName = `${fileId}${fileExtension}`;
       const finalPath = path.join(finalDir, finalFileName);
       
@@ -107,5 +113,10 @@ export class FileProcessor {
     if (mimeType.startsWith('image/')) return 'images';
     if (mimeType.startsWith('video/')) return 'videos';
     return 'docs';
+  }
+
+  private isHeicFormat(filename: string): boolean {
+    const ext = path.extname(filename).toLowerCase();
+    return ['.heic', '.heif'].includes(ext);
   }
 }

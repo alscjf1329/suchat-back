@@ -37,12 +37,21 @@ export class FileController {
       },
       fileFilter: (req, file, cb) => {
         const allowedMimes = [
+          // 이미지 포맷
           'image/jpeg',
+          'image/jpg',
           'image/png',
           'image/gif',
           'image/webp',
+          'image/heic',          // ✅ iPhone HEIC
+          'image/heif',          // ✅ iPhone HEIF
+          'image/heic-sequence', // ✅ Live Photo
+          'image/heif-sequence', // ✅ Live Photo
+          // 비디오 포맷
           'video/mp4',
           'video/webm',
+          'video/quicktime',     // ✅ iPhone MOV
+          // 문서 포맷
           'application/pdf',
           'application/msword',
           'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
@@ -51,7 +60,8 @@ export class FileController {
         if (allowedMimes.includes(file.mimetype)) {
           cb(null, true);
         } else {
-          cb(new BadRequestException('File type not allowed'), false);
+          console.error(`❌ 허용되지 않은 파일 형식: ${file.mimetype}`);
+          cb(new BadRequestException(`File type not allowed: ${file.mimetype}`), false);
         }
       },
     }),
