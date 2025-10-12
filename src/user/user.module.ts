@@ -1,6 +1,7 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { UserController } from './user.controller';
+import { FriendController } from './friend.controller';
 import { UserService } from './user.service';
 import { User, Friend } from './entities';
 import { PostgresUserRepository, MemoryUserRepository } from './repositories/user.repository';
@@ -12,7 +13,7 @@ import { AuthModule } from '../auth/auth.module';
     TypeOrmModule.forFeature([User, Friend]),
     forwardRef(() => AuthModule),
   ],
-  controllers: [UserController],
+  controllers: [UserController, FriendController],
   providers: [
     UserService,
     {

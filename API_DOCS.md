@@ -82,45 +82,16 @@
 
 ---
 
-### 사용자 정보 조회
-**GET** `/auth/user/:id`
+### 토큰 갱신
+**POST** `/auth/refresh`
 
-특정 사용자의 정보를 조회합니다.
-
-#### 응답
-```json
-{
-  "success": true,
-  "data": {
-    "id": "uuid",
-    "name": "사용자 이름",
-    "email": "user@example.com",
-    "phone": "010-1234-5678",
-    "birthday": "1990-01-01T00:00:00.000Z",
-    "isActive": true,
-    "lastLoginAt": "2024-01-01T00:00:00.000Z",
-    "createdAt": "2024-01-01T00:00:00.000Z",
-    "updatedAt": "2024-01-01T00:00:00.000Z"
-  }
-}
-```
-
-#### 에러 응답
-- **404 Not Found**: 사용자를 찾을 수 없음
-
----
-
-### 사용자 정보 수정
-**PUT** `/auth/user/:id`
-
-사용자 정보를 수정합니다.
+Refresh Token을 사용하여 새로운 Access Token을 발급받습니다.
 
 #### 요청 본문
 ```json
 {
-  "name": "새로운 이름",
-  "phone": "010-9876-5432",
-  "birthday": "1995-05-15"
+  "refreshToken": "your_refresh_token",
+  "deviceType": "desktop"  // 또는 "mobile"
 }
 ```
 
@@ -128,56 +99,110 @@
 ```json
 {
   "success": true,
-  "message": "사용자 정보가 업데이트되었습니다.",
   "data": {
-    "id": "uuid",
-    "name": "새로운 이름",
-    "email": "user@example.com",
-    "phone": "010-9876-5432",
-    "birthday": "1995-05-15T00:00:00.000Z",
-    "isActive": true,
-    "lastLoginAt": "2024-01-01T00:00:00.000Z",
-    "createdAt": "2024-01-01T00:00:00.000Z",
-    "updatedAt": "2024-01-01T00:00:00.000Z"
+    "accessToken": "new_access_token",
+    "refreshToken": "new_refresh_token"
   }
 }
 ```
 
 #### 에러 응답
-- **404 Not Found**: 사용자를 찾을 수 없음
-- **400 Bad Request**: 유효성 검증 실패
+- **401 Unauthorized**: 유효하지 않은 Refresh Token
 
 ---
 
-### 사용자 삭제
-**DELETE** `/auth/user/:id`
+### 로그아웃
+**POST** `/auth/logout`
 
-사용자 계정을 삭제합니다.
-
-#### 응답
-```json
-{
-  "success": true,
-  "message": "사용자 계정이 삭제되었습니다."
-}
-```
-
-#### 에러 응답
-- **404 Not Found**: 사용자를 찾을 수 없음
-
----
-
-## 📧 이메일 중복 확인 API
-
-### 이메일 중복 확인
-**POST** `/auth/check-email`
-
-이메일이 이미 사용 중인지 확인합니다.
+Refresh Token을 무효화하여 로그아웃합니다.
 
 #### 요청 본문
 ```json
 {
-  "email": "user@example.com"
+  "refreshToken": "your_refresh_token"
+}
+```
+
+#### 응답
+```json
+{
+  "success": true,
+  "message": "Logged out successfully"
+}
+```
+
+---
+
+## 👥 사용자 관리 API
+
+### 모든 사용자 목록 조회
+**GET** `/users`
+
+모든 사용자 목록을 조회합니다.
+
+#### 응답
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "uuid",
+      "name": "사용자 이름",
+      "email": "user@example.com",
+      "isActive": true,
+      "createdAt": "2024-01-01T00:00:00.000Z",
+      "updatedAt": "2024-01-01T00:00:00.000Z"
+    }
+  ]
+}
+```
+
+---
+
+### 사용자 검색
+**GET** `/users/search?q={query}&limit={limit}&offset={offset}`
+
+이름 또는 이메일로 사용자를 검색합니다.
+
+#### 쿼리 파라미터
+- `q`: 검색어 (필수)
+- `limit`: 한 번에 가져올 개수 (기본값: 20)
+- `offset`: 시작 위치 (기본값: 0)
+
+#### 응답
+```json
+{
+  "success": true,
+  "data": {
+    "users": [
+      {
+        "id": "uuid",
+        "name": "사용자 이름",
+        "email": "user@example.com",
+        "isActive": true,
+        "createdAt": "2024-01-01T00:00:00.000Z",
+        "updatedAt": "2024-01-01T00:00:00.000Z"
+      }
+    ],
+    "total": 1
+  }
+}
+```
+
+---
+
+## 👫 친구 관리 API
+
+### 친구 요청 보내기
+**POST** `/friends/request`
+
+다른 사용자에게 친구 요청을 보냅니다.
+
+#### 요청 본문
+```json
+{
+  "requesterId": "requester_uuid",
+  "addresseeId": "addressee_uuid"
 }
 ```
 
@@ -186,13 +211,142 @@
 {
   "success": true,
   "data": {
-    "exists": false
+    "id": "friend_request_id",
+    "requesterId": "requester_uuid",
+    "addresseeId": "addressee_uuid",
+    "status": "PENDING",
+    "createdAt": "2024-01-01T00:00:00.000Z"
   }
 }
 ```
 
-#### 에러 응답
-- **400 Bad Request**: 유효성 검증 실패
+---
+
+### 친구 요청 수락
+**PUT** `/friends/:friendId/accept`
+
+받은 친구 요청을 수락합니다. (인증 필요)
+
+#### 응답
+```json
+{
+  "success": true,
+  "data": {
+    "id": "friend_request_id",
+    "status": "ACCEPTED"
+  }
+}
+```
+
+---
+
+### 친구 요청 거절
+**PUT** `/friends/:friendId/reject`
+
+받은 친구 요청을 거절합니다. (인증 필요)
+
+#### 응답
+```json
+{
+  "success": true,
+  "data": {
+    "id": "friend_request_id",
+    "status": "REJECTED"
+  }
+}
+```
+
+---
+
+### 받은 친구 요청 목록
+**GET** `/friends/requests/received`
+
+받은 친구 요청 목록을 조회합니다. (인증 필요)
+
+#### 응답
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "friend_request_id",
+      "requester": {
+        "id": "uuid",
+        "name": "요청자 이름",
+        "email": "requester@example.com"
+      },
+      "status": "PENDING",
+      "createdAt": "2024-01-01T00:00:00.000Z"
+    }
+  ]
+}
+```
+
+---
+
+### 보낸 친구 요청 목록
+**GET** `/friends/requests/sent`
+
+보낸 친구 요청 목록을 조회합니다. (인증 필요)
+
+#### 응답
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "friend_request_id",
+      "addressee": {
+        "id": "uuid",
+        "name": "수신자 이름",
+        "email": "addressee@example.com"
+      },
+      "status": "PENDING",
+      "createdAt": "2024-01-01T00:00:00.000Z"
+    }
+  ]
+}
+```
+
+---
+
+### 친구 목록
+**GET** `/friends`
+
+현재 사용자의 친구 목록을 조회합니다. (인증 필요)
+
+#### 응답
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "friend_id",
+      "friend": {
+        "id": "uuid",
+        "name": "친구 이름",
+        "email": "friend@example.com"
+      },
+      "status": "ACCEPTED",
+      "createdAt": "2024-01-01T00:00:00.000Z"
+    }
+  ]
+}
+```
+
+---
+
+### 친구 요청 삭제/취소
+**DELETE** `/friends/:friendId`
+
+친구 요청을 삭제하거나 취소합니다. (인증 필요)
+
+#### 응답
+```json
+{
+  "success": true
+}
+```
 
 ---
 
@@ -379,39 +533,49 @@ const signInData = {
 const loginResponse = await apiClient.signIn(signInData);
 console.log(loginResponse.data);
 
-// 이메일 중복 확인
-const emailCheckResponse = await apiClient.checkEmailExists('hong@example.com');
-console.log(emailCheckResponse.data.exists); // false
+// 사용자 검색
+const searchResponse = await apiClient.searchUsers('홍길동', 20, 0);
+console.log(searchResponse.data.users);
+
+// 친구 요청 보내기
+const friendRequest = await apiClient.sendFriendRequest('friend_uuid');
+console.log(friendRequest.data);
 ```
 
 ### cURL
 ```bash
 # 회원가입
-curl -X POST http://localhost:3000/auth/signup \
+curl -X POST http://localhost:8000/auth/signup \
   -H "Content-Type: application/json" \
   -d '{
     "name": "홍길동",
     "email": "hong@example.com",
-    "password": "password123",
-    "confirmPassword": "password123",
-    "phone": "010-1234-5678",
-    "birthday": "1990-01-01"
-  }'
-
-# 로그인
-curl -X POST http://localhost:3000/auth/signin \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "hong@example.com",
     "password": "password123"
   }'
 
-# 이메일 중복 확인
-curl -X POST http://localhost:3000/auth/check-email \
+# 로그인
+curl -X POST http://localhost:8000/auth/signin \
   -H "Content-Type: application/json" \
   -d '{
-    "email": "hong@example.com"
+    "email": "hong@example.com",
+    "password": "password123",
+    "deviceType": "desktop"
   }'
+
+# 사용자 검색
+curl -X GET "http://localhost:8000/users/search?q=홍길동&limit=20&offset=0"
+
+# 친구 요청 보내기
+curl -X POST http://localhost:8000/friends/request \
+  -H "Content-Type: application/json" \
+  -d '{
+    "requesterId": "your_user_id",
+    "addresseeId": "friend_user_id"
+  }'
+
+# 친구 목록 조회 (인증 필요)
+curl -X GET http://localhost:8000/friends \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
 ```
 
 ---

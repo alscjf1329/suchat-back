@@ -1,7 +1,8 @@
-import { Controller, Post, Get, Body, Query, UsePipes, ValidationPipe } from '@nestjs/common';
+import { Controller, Post, Get, Body, Query, UsePipes, ValidationPipe, forwardRef, Inject } from '@nestjs/common';
 import { IsEmail, IsString, IsNotEmpty } from 'class-validator';
 import { EmailVerificationService } from './services/email-verification.service';
 import { EmailService } from './services/email.service';
+import { UserService } from '../user/user.service';
 
 export class SendVerificationEmailDto {
   @IsEmail({}, { message: '올바른 이메일 형식이 아닙니다.' })
@@ -40,7 +41,48 @@ export class AuthController {
   constructor(
     private emailVerificationService: EmailVerificationService,
     private emailService: EmailService,
+    @Inject(forwardRef(() => UserService))
+    private userService: UserService,
   ) {}
+
+  // ============ 회원가입 & 로그인 ============
+  
+  @Post('signup')
+  async signUp(
+    @Body('email') email: string,
+    @Body('password') password: string,
+    @Body('name') name: string,
+  ) {
+    const user = await this.userService.signUp(email, password, name);
+    return { success: true, data: user };
+  }
+
+  @Post('signin')
+  async signIn(
+    @Body('email') email: string,
+    @Body('password') password: string,
+    @Body('deviceType') deviceType?: 'mobile' | 'desktop',
+  ) {
+    const result = await this.userService.signIn(email, password, deviceType || 'desktop');
+    return { success: true, data: result };
+  }
+
+  @Post('refresh')
+  async refreshToken(
+    @Body('refreshToken') refreshToken: string,
+    @Body('deviceType') deviceType?: 'mobile' | 'desktop',
+  ) {
+    const result = await this.userService.refreshToken(refreshToken, deviceType || 'desktop');
+    return { success: true, data: result };
+  }
+
+  @Post('logout')
+  async logout(@Body('refreshToken') refreshToken: string) {
+    await this.userService.logout(refreshToken);
+    return { success: true, message: 'Logged out successfully' };
+  }
+
+  // ============ 이메일 인증 ============
 
   @Post('send-verification-email')
   @UsePipes(new ValidationPipe({ transform: true }))
