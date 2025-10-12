@@ -14,6 +14,27 @@ export class SendVerificationEmailDto {
   name: string;
 }
 
+export class SignUpRequestDto {
+  @IsEmail({}, { message: '올바른 이메일 형식이 아닙니다.' })
+  @IsNotEmpty({ message: '이메일을 입력해주세요.' })
+  email: string;
+  
+  @IsString({ message: '이름은 문자열이어야 합니다.' })
+  @IsNotEmpty({ message: '이름을 입력해주세요.' })
+  name: string;
+
+  @IsString({ message: '비밀번호는 문자열이어야 합니다.' })
+  @IsNotEmpty({ message: '비밀번호를 입력해주세요.' })
+  password: string;
+
+  @IsString({ message: '비밀번호 확인은 문자열이어야 합니다.' })
+  @IsNotEmpty({ message: '비밀번호 확인을 입력해주세요.' })
+  confirmPassword: string;
+
+  phone?: string;
+  birthday?: string;
+}
+
 export class ResendVerificationDto {
   @IsEmail({}, { message: '올바른 이메일 형식이 아닙니다.' })
   @IsNotEmpty({ message: '이메일을 입력해주세요.' })
@@ -47,16 +68,6 @@ export class AuthController {
 
   // ============ 회원가입 & 로그인 ============
   
-  @Post('signup')
-  async signUp(
-    @Body('email') email: string,
-    @Body('password') password: string,
-    @Body('name') name: string,
-  ) {
-    const user = await this.userService.signUp(email, password, name);
-    return { success: true, data: user };
-  }
-
   @Post('signin')
   async signIn(
     @Body('email') email: string,
@@ -82,7 +93,78 @@ export class AuthController {
     return { success: true, message: 'Logged out successfully' };
   }
 
-  // ============ 이메일 인증 ============
+  // ============ 이메일 인증 (회원가입) ============
+
+  // 회원가입 (email_verifications 테이블에 저장 + 이메일 발송)
+  @Post('signup')
+  @UsePipes(new ValidationPipe({ transform: true }))
+  async signUp(@Body() body: SignUpRequestDto) {
+    try {
+      const { email, name, password, confirmPassword, phone, birthday } = body;
+
+      // 비밀번호 일치 확인
+      if (password !== confirmPassword) {
+        return {
+          success: false,
+          message: '비밀번호가 일치하지 않습니다.',
+        };
+      }
+
+      // 이메일 중복 확인
+      const existingUser = await this.userService.findByEmail?.(email);
+      if (existingUser) {
+        return {
+          success: false,
+          message: '이미 사용 중인 이메일입니다.',
+        };
+      }
+
+      // 비밀번호 해시화
+      const bcrypt = require('bcrypt');
+      const hashedPassword = await bcrypt.hash(password, 10);
+
+      // 사용자 데이터 준비
+      const userData = {
+        name,
+        password: hashedPassword,
+        phone: phone || null,
+        birthday: birthday || null,
+        isActive: true,
+      };
+
+      // 토큰 생성 및 email_verifications에 저장
+      const token = await this.emailVerificationService.generateVerificationToken(
+        email,
+        userData,
+        'signup'
+      );
+
+      // 이메일 발송
+      const emailSent = await this.emailService.sendVerificationEmail(
+        email,
+        token,
+        name
+      );
+
+      if (!emailSent) {
+        return {
+          success: false,
+          message: '이메일 발송에 실패했습니다.',
+        };
+      }
+
+      return {
+        success: true,
+        message: '인증 이메일이 발송되었습니다. 이메일을 확인해주세요.',
+      };
+    } catch (error) {
+      console.error('회원가입 요청 에러:', error);
+      return {
+        success: false,
+        message: '회원가입 요청 중 오류가 발생했습니다.',
+      };
+    }
+  }
 
   @Post('send-verification-email')
   @UsePipes(new ValidationPipe({ transform: true }))

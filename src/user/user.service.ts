@@ -18,28 +18,6 @@ export class UserService {
     private readonly tokenService: TokenService,
   ) {}
 
-  async signUp(email: string, password: string, name: string): Promise<User> {
-    this.logger.log(`SignUp attempt for email: ${email}`);
-    
-    const existingUser = await this.userRepository.findByEmail(email);
-    if (existingUser) {
-      this.logger.warn(`SignUp failed: Email already exists - ${email}`);
-      throw new ConflictException('Email already exists');
-    }
-
-    const hashedPassword = await bcrypt.hash(password, 10);
-    this.logger.debug(`Password hashed for user: ${email}`);
-
-    const user = await this.userRepository.create({
-      email,
-      password: hashedPassword,
-      name,
-    });
-
-    this.logger.log(`User created successfully: ${user.id} (${email})`);
-    return user;
-  }
-
   async signIn(
     email: string, 
     password: string, 
@@ -96,6 +74,10 @@ export class UserService {
   async logout(refreshToken: string): Promise<void> {
     this.logger.log('Logout attempt');
     await this.tokenService.revokeRefreshToken(refreshToken);
+  }
+
+  async findByEmail(email: string): Promise<User | null> {
+    return await this.userRepository.findByEmail(email);
   }
 
   async getAllUsers(): Promise<User[]> {
