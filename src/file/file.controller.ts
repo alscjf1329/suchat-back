@@ -57,11 +57,24 @@ export class FileController {
           'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
         ];
         
-        if (allowedMimes.includes(file.mimetype)) {
+        // 확장자 기반 체크 (MIME type이 정확하지 않을 수 있음)
+        const allowedExtensions = [
+          '.jpg', '.jpeg', '.png', '.gif', '.webp',
+          '.heic', '.heif',
+          '.mp4', '.webm', '.mov',
+          '.pdf', '.doc', '.docx'
+        ];
+        
+        const ext = extname(file.originalname).toLowerCase();
+        const isMimeAllowed = allowedMimes.includes(file.mimetype);
+        const isExtAllowed = allowedExtensions.includes(ext);
+        
+        // MIME type 또는 확장자 둘 중 하나라도 허용되면 OK
+        if (isMimeAllowed || isExtAllowed) {
           cb(null, true);
         } else {
-          console.error(`❌ 허용되지 않은 파일 형식: ${file.mimetype}`);
-          cb(new BadRequestException(`File type not allowed: ${file.mimetype}`), false);
+          console.error(`❌ 허용되지 않은 파일: ${file.originalname} (${file.mimetype})`);
+          cb(new BadRequestException(`File type not allowed: ${file.originalname}`), false);
         }
       },
     }),
