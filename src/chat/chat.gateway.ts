@@ -169,22 +169,23 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       // 채팅방의 모든 참여자 조회
       const participants = await this.chatService.getRoomParticipants(roomId);
       
-      // 소켓에 연결된 사용자 ID 추출
-      const connectedUserIds = Array.from(this.server.sockets.sockets.values())
+      // 현재 채팅방에 있는 사용자 ID 추출 (Socket.io room 기반)
+      const roomSockets = await this.server.in(roomId).fetchSockets();
+      const usersInRoom = roomSockets
         .map((socket) => (socket as any).userId)
         .filter(Boolean);
 
-      // 발신자를 제외한 오프라인 참여자에게만 푸시
-      const offlineParticipants = participants
+      // 발신자를 제외하고, 현재 채팅방에 없는 참여자에게만 푸시
+      const notInRoomParticipants = participants
         .filter((p) => p.userId !== senderId) // 발신자 제외
-        .filter((p) => !connectedUserIds.includes(p.userId)); // 오프라인만
+        .filter((p) => !usersInRoom.includes(p.userId)); // 채팅방에 없는 사람만
 
       this.logger.debug(
-        `[push] 오프라인 참여자: ${offlineParticipants.length}명 (전체: ${participants.length}명, 온라인: ${connectedUserIds.length}명)`,
+        `[push] 푸시 대상: ${notInRoomParticipants.length}명 (전체: ${participants.length}명, 채팅방 내: ${usersInRoom.length}명)`,
       );
 
-      // 각 오프라인 사용자에게 푸시 알림 큐 추가
-      for (const participant of offlineParticipants) {
+      // 채팅방에 없는 사용자에게 푸시 알림 큐 추가
+      for (const participant of notInRoomParticipants) {
         await this.pushService.sendPushNotification({
           userId: participant.userId,
           title: room.name || '새 메시지',
@@ -202,7 +203,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         });
       }
 
-      this.logger.log(`[push] 푸시 알림 큐 추가 완료: ${offlineParticipants.length}명`);
+      this.logger.log(`[push] 푸시 알림 큐 추가 완료: ${notInRoomParticipants.length}명`);
     } catch (error) {
       this.logger.error(`[push] 푸시 알림 발송 실패: ${error.message}`, error.stack);
     }
