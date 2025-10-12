@@ -1,5 +1,5 @@
-import { Controller, Post, Get, Body, Query, UsePipes, ValidationPipe, forwardRef, Inject } from '@nestjs/common';
-import { IsEmail, IsString, IsNotEmpty } from 'class-validator';
+import { Controller, Post, Body, forwardRef, Inject } from '@nestjs/common';
+import { IsEmail, IsString, IsNotEmpty, IsOptional } from 'class-validator';
 import { EmailVerificationService } from './services/email-verification.service';
 import { EmailService } from './services/email.service';
 import { UserService } from '../user/user.service';
@@ -31,7 +31,12 @@ export class SignUpRequestDto {
   @IsNotEmpty({ message: '비밀번호 확인을 입력해주세요.' })
   confirmPassword: string;
 
+  @IsOptional()
+  @IsString({ message: '전화번호는 문자열이어야 합니다.' })
   phone?: string;
+
+  @IsOptional()
+  @IsString({ message: '생년월일은 문자열이어야 합니다.' })
   birthday?: string;
 }
 
@@ -97,7 +102,6 @@ export class AuthController {
 
   // 회원가입 (email_verifications 테이블에 저장 + 이메일 발송)
   @Post('signup')
-  @UsePipes(new ValidationPipe({ transform: true }))
   async signUp(@Body() body: SignUpRequestDto) {
     try {
       const { email, name, password, confirmPassword, phone, birthday } = body;
@@ -167,7 +171,6 @@ export class AuthController {
   }
 
   @Post('send-verification-email')
-  @UsePipes(new ValidationPipe({ transform: true }))
   async sendVerificationEmail(@Body() body: SendVerificationEmailDto) {
     try {
       // 기존 인증 요청이 있는지 확인
@@ -215,21 +218,18 @@ export class AuthController {
   }
 
   @Post('verify-email')
-  @UsePipes(new ValidationPipe({ transform: true }))
   async verifyEmail(@Body() body: { token: string }) {
     const result = await this.emailVerificationService.verifyEmail(body.token);
     return result;
   }
 
   @Post('resend-verification')
-  @UsePipes(new ValidationPipe({ transform: true }))
   async resendVerification(@Body() body: ResendVerificationDto) {
     const result = await this.emailVerificationService.resendVerificationEmail(body.email);
     return result;
   }
 
   @Post('forgot-password')
-  @UsePipes(new ValidationPipe({ transform: true }))
   async forgotPassword(@Body() body: ForgotPasswordDto) {
     try {
       const result = await this.emailVerificationService.sendPasswordResetEmail(body.email);
@@ -244,7 +244,6 @@ export class AuthController {
   }
 
   @Post('reset-password')
-  @UsePipes(new ValidationPipe({ transform: true }))
   async resetPassword(@Body() body: ResetPasswordDto) {
     try {
       const result = await this.emailVerificationService.resetPassword(body.token, body.newPassword);
