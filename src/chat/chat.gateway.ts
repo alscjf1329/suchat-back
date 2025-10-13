@@ -6,9 +6,12 @@ import {
   ConnectedSocket,
   OnGatewayConnection,
   OnGatewayDisconnect,
+  OnGatewayInit,
 } from '@nestjs/websockets';
 import { Logger } from '@nestjs/common';
 import { Server, Socket } from 'socket.io';
+import { createAdapter } from '@socket.io/redis-adapter';
+import { createClient } from 'redis';
 import { ChatService } from './chat.service';
 import { PushService } from '../push/push.service';
 import { randomUUID } from 'crypto';
@@ -18,7 +21,7 @@ import { randomUUID } from 'crypto';
     origin: '*',
   },
 })
-export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
+export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect {
   private readonly logger = new Logger(ChatGateway.name);
 
   @WebSocketServer()
@@ -28,6 +31,20 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private readonly chatService: ChatService,
     private readonly pushService: PushService,
   ) {}
+
+  async afterInit(server: Server) {
+    // Redis Adapter 설정 (PM2 cluster 모드 지원)
+    const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
+    
+    const pubClient = createClient({ url: redisUrl });
+    const subClient = pubClient.duplicate();
+
+    await Promise.all([pubClient.connect(), subClient.connect()]);
+
+    server.adapter(createAdapter(pubClient, subClient));
+    
+    this.logger.log('✅ Socket.IO Redis Adapter 연결 완료 - PM2 Cluster 지원');
+  }
 
   handleConnection(client: Socket) {
     this.logger.log(`[WS] 클라이언트 연결: ${client.id}`);
