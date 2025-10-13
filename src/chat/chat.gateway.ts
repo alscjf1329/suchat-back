@@ -51,16 +51,16 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   @SubscribeMessage('join_room')
   async handleJoinRoom(
-    @MessageBody() data: { roomId: string; roomName?: string; userId: string },
+    @MessageBody() data: { roomId: string; roomName?: string; userId: string; isVisible?: boolean },
     @ConnectedSocket() client: Socket,
   ) {
-    const { roomId, roomName, userId } = data;
-    this.logger.log(`[join_room] 사용자 ${userId} 채팅방 참여 시도: ${roomId || roomName}`);
+    const { roomId, roomName, userId, isVisible } = data;
+    this.logger.log(`[join_room] 사용자 ${userId} 채팅방 참여 시도: ${roomId || roomName}, isVisible: ${isVisible}`);
     
     // 소켓에 userId 저장 (푸시 알림 오프라인 감지용)
     (client as any).userId = userId;
-    // 채팅방 참여 시 페이지가 보이는 상태로 설정
-    (client as any).isVisible = true;
+    // 채팅방 참여 시 visibility 설정 (클라이언트에서 제공하면 사용, 없으면 true로 기본 설정)
+    (client as any).isVisible = isVisible !== undefined ? isVisible : true;
     
     let actualRoomId = roomId;
     
