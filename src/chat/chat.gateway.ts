@@ -199,7 +199,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
             messageId: message.id,
             type: 'chat_message',
           },
-          tag: `room-${roomId}`, // 같은 방의 알림은 덮어쓰기
+          tag: roomId, // 채팅방 ID를 tag로 사용 (채팅방 입장 시 알림 제거 용이)
         });
       }
 
