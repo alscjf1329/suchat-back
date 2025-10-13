@@ -31,10 +31,22 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   handleConnection(client: Socket) {
     this.logger.log(`[WS] 클라이언트 연결: ${client.id}`);
+    // 기본적으로 페이지가 보이는 상태로 설정
+    (client as any).isVisible = true;
   }
 
   handleDisconnect(client: Socket) {
     this.logger.log(`[WS] 클라이언트 연결 해제: ${client.id}`);
+  }
+
+  @SubscribeMessage('set_visibility')
+  async handleSetVisibility(
+    @MessageBody() data: { visible: boolean },
+    @ConnectedSocket() client: Socket,
+  ) {
+    (client as any).isVisible = data.visible;
+    this.logger.debug(`[set_visibility] 클라이언트 ${client.id} visibility: ${data.visible}`);
+    return { success: true };
   }
 
   @SubscribeMessage('join_room')
@@ -47,6 +59,8 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     
     // 소켓에 userId 저장 (푸시 알림 오프라인 감지용)
     (client as any).userId = userId;
+    // 채팅방 참여 시 페이지가 보이는 상태로 설정
+    (client as any).isVisible = true;
     
     let actualRoomId = roomId;
     
@@ -169,23 +183,24 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       // 채팅방의 모든 참여자 조회
       const participants = await this.chatService.getRoomParticipants(roomId);
       
-      // 현재 채팅방에 있는 사용자 ID 추출 (Socket.io room 기반)
+      // 현재 채팅방에 있고 페이지가 보이는 사용자 ID 추출
       const roomSockets = await this.server.in(roomId).fetchSockets();
-      const usersInRoom = roomSockets
+      const visibleUsersInRoom = roomSockets
+        .filter((socket) => (socket as any).isVisible === true)
         .map((socket) => (socket as any).userId)
         .filter(Boolean);
 
-      // 발신자를 제외하고, 현재 채팅방에 없는 참여자에게만 푸시
-      const notInRoomParticipants = participants
+      // 발신자를 제외하고, 페이지가 보이지 않는 참여자에게 푸시
+      const pushTargets = participants
         .filter((p) => p.userId !== senderId) // 발신자 제외
-        .filter((p) => !usersInRoom.includes(p.userId)); // 채팅방에 없는 사람만
+        .filter((p) => !visibleUsersInRoom.includes(p.userId)); // 페이지가 보이지 않는 사람만
 
       this.logger.debug(
-        `[push] 푸시 대상: ${notInRoomParticipants.length}명 (전체: ${participants.length}명, 채팅방 내: ${usersInRoom.length}명)`,
+        `[push] 푸시 대상: ${pushTargets.length}명 (전체: ${participants.length}명, 화면에 보이는 사용자: ${visibleUsersInRoom.length}명)`,
       );
 
-      // 채팅방에 없는 사용자에게 푸시 알림 큐 추가
-      for (const participant of notInRoomParticipants) {
+      // 페이지가 보이지 않는 사용자에게 푸시 알림 큐 추가
+      for (const participant of pushTargets) {
         await this.pushService.sendPushNotification({
           userId: participant.userId,
           title: room.name || '새 메시지',
@@ -203,7 +218,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         });
       }
 
-      this.logger.log(`[push] 푸시 알림 큐 추가 완료: ${notInRoomParticipants.length}명`);
+      this.logger.log(`[push] 푸시 알림 큐 추가 완료: ${pushTargets.length}명`);
     } catch (error) {
       this.logger.error(`[push] 푸시 알림 발송 실패: ${error.message}`, error.stack);
     }
