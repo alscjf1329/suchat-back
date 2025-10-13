@@ -34,9 +34,24 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
 
   async afterInit(server: Server) {
     // Redis Adapter 설정 (PM2 cluster 모드 지원)
-    const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
+    const redisHost = process.env.REDIS_HOST || 'localhost';
+    const redisPort = parseInt(process.env.REDIS_PORT || '6379');
+    const redisPassword = process.env.REDIS_PASSWORD;
     
-    const pubClient = createClient({ url: redisUrl });
+    const redisConfig: any = {
+      socket: {
+        host: redisHost,
+        port: redisPort,
+      },
+    };
+    
+    if (redisPassword) {
+      redisConfig.password = redisPassword;
+    }
+    
+    this.logger.log(`🔗 Redis 연결: ${redisHost}:${redisPort}`);
+    
+    const pubClient = createClient(redisConfig);
     const subClient = pubClient.duplicate();
 
     await Promise.all([pubClient.connect(), subClient.connect()]);
