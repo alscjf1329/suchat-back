@@ -43,14 +43,23 @@ export class FileController {
           'image/png',
           'image/gif',
           'image/webp',
-          'image/heic',          // ✅ iPhone HEIC
-          'image/heif',          // ✅ iPhone HEIF
-          'image/heic-sequence', // ✅ Live Photo
-          'image/heif-sequence', // ✅ Live Photo
+          'image/bmp',
+          'image/tiff',
+          'image/svg+xml',
+          // 아이폰 HEIC/HEIF 포맷 (모든 변형 포함)
+          'image/heic',
+          'image/heif',
+          'image/heic-sequence',
+          'image/heif-sequence',
+          'image/x-heic',
+          'image/x-heif',
+          // 아이폰에서 때때로 사용하는 대체 MIME 타입
+          'application/octet-stream', // HEIC 파일이 이 MIME type으로 올 수 있음
           // 비디오 포맷
           'video/mp4',
           'video/webm',
-          'video/quicktime',     // ✅ iPhone MOV
+          'video/quicktime',     // 아이폰 MOV
+          'video/x-m4v',
           // 문서 포맷
           'application/pdf',
           'application/msword',
@@ -58,10 +67,14 @@ export class FileController {
         ];
         
         // 확장자 기반 체크 (MIME type이 정확하지 않을 수 있음)
+        // 특히 아이폰에서는 HEIC 파일이 잘못된 MIME type으로 전송될 수 있음
         const allowedExtensions = [
-          '.jpg', '.jpeg', '.png', '.gif', '.webp',
-          '.heic', '.heif',
-          '.mp4', '.webm', '.mov',
+          // 이미지 확장자
+          '.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.tiff', '.svg',
+          '.heic', '.heif', // 아이폰 HEIC/HEIF
+          // 비디오 확장자
+          '.mp4', '.webm', '.mov', '.m4v',
+          // 문서 확장자
           '.pdf', '.doc', '.docx'
         ];
         
@@ -69,11 +82,21 @@ export class FileController {
         const isMimeAllowed = allowedMimes.includes(file.mimetype);
         const isExtAllowed = allowedExtensions.includes(ext);
         
+        console.log('📁 파일 업로드 시도:', {
+          filename: file.originalname,
+          mimetype: file.mimetype,
+          extension: ext,
+          mimeAllowed: isMimeAllowed,
+          extAllowed: isExtAllowed
+        });
+        
         // MIME type 또는 확장자 둘 중 하나라도 허용되면 OK
+        // 이렇게 하면 아이폰에서 잘못된 MIME type으로 전송되어도 확장자로 검증 가능
         if (isMimeAllowed || isExtAllowed) {
+          console.log('✅ 파일 업로드 허용:', file.originalname);
           cb(null, true);
         } else {
-          console.error(`❌ 허용되지 않은 파일: ${file.originalname} (${file.mimetype})`);
+          console.error(`❌ 허용되지 않은 파일: ${file.originalname} (MIME: ${file.mimetype}, EXT: ${ext})`);
           cb(new BadRequestException(`File type not allowed: ${file.originalname}`), false);
         }
       },

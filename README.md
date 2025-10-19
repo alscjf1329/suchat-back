@@ -12,6 +12,7 @@ SuChat Backend는 NestJS 프레임워크를 기반으로 구축된 실시간 채
 - 🏠 **채팅방 관리**: 채팅방 생성, 참여, 퇴장 기능
 - 📁 **파일 업로드**: 이미지, 비디오, 문서 파일 업로드 및 처리
 - 🖼️ **이미지 최적화**: Sharp를 활용한 이미지 리사이징 및 썸네일 생성
+- 📱 **아이폰 이미지 지원**: HEIC/HEIF 형식 자동 JPEG 변환
 - 🔄 **비동기 처리**: Bull Queue를 통한 파일 처리 작업 관리
 - 🗄️ **데이터 저장**: PostgreSQL 데이터베이스와 메모리 DB 지원
 - 📊 **관리 도구**: pgAdmin, Redis Commander 포함
@@ -186,9 +187,14 @@ USE_MEMORY_DB=false
 - `GET /push/subscriptions` - 내 구독 목록
 
 ### 파일 업로드 (File)
-- `POST /file/upload` - 파일 업로드
+- `POST /file/upload` - 파일 업로드 (📱 **아이폰 JPEG/HEIC 지원**)
 - `GET /file/status/:jobId` - 파일 처리 상태 확인
 - `GET /file/serve/:type/:filename` - 파일 서빙
+
+#### 지원 파일 형식
+- **이미지**: JPEG, PNG, GIF, WebP, BMP, TIFF, SVG, **HEIC/HEIF** (아이폰)
+- **비디오**: MP4, WebM, **MOV** (아이폰), M4V
+- **문서**: PDF, DOC, DOCX
 
 ### WebSocket 이벤트
 - `join_room` - 채팅방 참여
@@ -221,9 +227,16 @@ USE_MEMORY_DB=false
 3. **큐 작업**: Bull Queue에 파일 처리 작업 추가
 4. **비동기 처리**: 
    - 이미지: Sharp로 리사이징 및 최적화
-   - 썸네일 생성
+   - **📱 HEIC/HEIF → JPEG 자동 변환** (아이폰 이미지 지원)
+   - 썸네일 생성 (300x300)
    - 최종 디렉토리로 이동
 5. **완료**: 처리된 파일 정보 반환
+
+### 아이폰 이미지 처리 특징
+- **HEIC/HEIF 형식 자동 변환**: 아이폰에서 촬영한 HEIC/HEIF 이미지를 JPEG로 자동 변환
+- **MIME 타입 유연성**: 잘못된 MIME 타입으로 전송되어도 확장자 기반으로 검증
+- **Live Photo 지원**: image/heic-sequence, image/heif-sequence 지원
+- **브라우저 호환성**: 모든 브라우저에서 볼 수 있는 JPEG로 변환하여 저장
 
 ## 🧪 테스트
 

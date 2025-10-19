@@ -464,6 +464,137 @@ Refresh Token을 무효화하여 로그아웃합니다.
 
 ---
 
+## 📁 파일 업로드 API
+
+### 파일 업로드
+**POST** `/file/upload`
+
+이미지, 비디오, 문서 파일을 업로드합니다. **아이폰 HEIC/HEIF 이미지를 자동으로 JPEG로 변환**합니다.
+
+#### 요청 형식
+- **Content-Type**: `multipart/form-data`
+- **인증**: 필요 없음 (공개 API)
+
+#### 폼 데이터
+```javascript
+const formData = new FormData()
+formData.append('file', file)              // 업로드할 파일
+formData.append('userId', 'user-uuid')     // 업로드 사용자 ID
+formData.append('roomId', 'room-uuid')     // 채팅방 ID
+```
+
+#### 지원 파일 형식
+- **이미지**: JPEG, PNG, GIF, WebP, BMP, TIFF, SVG
+- **📱 아이폰 이미지**: HEIC, HEIF, HEIC-Sequence, HEIF-Sequence
+- **비디오**: MP4, WebM, MOV (아이폰), M4V
+- **문서**: PDF, DOC, DOCX
+
+#### 파일 크기 제한
+- 최대: 100MB
+
+#### 응답
+```json
+{
+  "jobId": "job-id",
+  "fileId": "abc123def",
+  "fileName": "abc123def.jpg",
+  "fileType": "images",
+  "fileUrl": "/uploads/images/abc123def.jpg",
+  "originalName": "photo.heic",
+  "size": 2048576,
+  "status": "completed",
+  "message": "File uploaded successfully, processing...",
+  "result": {
+    "fileId": "abc123def",
+    "originalName": "photo.heic",
+    "mimeType": "image/heic",
+    "size": 2048576,
+    "finalPath": "/images/abc123def.jpg",
+    "thumbnailPath": "/thumbnails/abc123def_thumb.jpg",
+    "processedAt": "2025-10-19T10:30:00.000Z"
+  }
+}
+```
+
+#### 에러 응답
+- **400 Bad Request**: 
+  - 파일이 없음
+  - 허용되지 않은 파일 형식
+  - 파일 크기 초과 (100MB)
+- **500 Internal Server Error**: 파일 처리 중 오류 발생
+
+#### 📱 아이폰 이미지 처리 특징
+1. **HEIC/HEIF → JPEG 자동 변환**
+   - 아이폰에서 촬영한 HEIC/HEIF 이미지를 JPEG로 변환
+   - 모든 브라우저에서 호환 가능한 형식으로 저장
+   
+2. **MIME 타입 유연성**
+   - 잘못된 MIME 타입으로 전송되어도 확장자 기반으로 검증
+   - `application/octet-stream`으로 전송되는 HEIC 파일도 처리 가능
+   
+3. **이미지 최적화**
+   - 자동 리사이징 (최대 1920x1080, 비율 유지)
+   - JPEG 품질 85%로 압축
+   - 300x300 썸네일 자동 생성
+
+4. **Live Photo 지원**
+   - `image/heic-sequence`, `image/heif-sequence` 지원
+
+---
+
+### 파일 처리 상태 확인
+**GET** `/file/status/:jobId`
+
+파일 처리 작업의 현재 상태를 확인합니다.
+
+#### URL 파라미터
+- `jobId`: 파일 업로드 시 받은 작업 ID
+
+#### 응답
+```json
+{
+  "status": "completed",
+  "progress": 100,
+  "result": {
+    "fileId": "abc123def",
+    "originalName": "photo.heic",
+    "finalPath": "/images/abc123def.jpg",
+    "thumbnailPath": "/thumbnails/abc123def_thumb.jpg",
+    "processedAt": "2025-10-19T10:30:00.000Z"
+  }
+}
+```
+
+#### 상태 값
+- `waiting`: 대기 중
+- `active`: 처리 중
+- `completed`: 완료
+- `failed`: 실패
+- `not_found`: 작업을 찾을 수 없음
+
+---
+
+### 파일 서빙
+**GET** `/file/serve/:type/:filename`
+
+업로드된 파일을 제공합니다.
+
+#### URL 파라미터
+- `type`: 파일 타입 (`images`, `videos`, `docs`, `thumbnails`)
+- `filename`: 파일명
+
+#### 예시
+```
+GET /file/serve/images/abc123def.jpg
+GET /file/serve/thumbnails/abc123def_thumb.jpg
+GET /file/serve/videos/xyz789.mp4
+```
+
+#### 응답
+파일 바이너리 데이터 (실제 파일)
+
+---
+
 ## 📝 유효성 검증 규칙
 
 ### 회원가입 데이터
