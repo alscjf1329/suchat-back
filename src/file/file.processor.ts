@@ -17,7 +17,8 @@ export class FileProcessor {
       
       // Create final directory based on file type
       const fileType = this.getFileType(mimeType);
-      const finalDir = path.join('./uploads', fileType);
+      const uploadPath = process.env.UPLOAD_PATH || './uploads';
+      const finalDir = path.join(uploadPath, fileType);
       
       // Ensure directory exists
       if (!fs.existsSync(finalDir)) {
@@ -91,7 +92,8 @@ export class FileProcessor {
   }
 
   private async generateThumbnail(imagePath: string, fileId: string): Promise<string> {
-    const thumbnailDir = path.join('./uploads', 'thumbnails');
+    const uploadPath = process.env.UPLOAD_PATH || './uploads';
+    const thumbnailDir = path.join(uploadPath, 'thumbnails');
     
     if (!fs.existsSync(thumbnailDir)) {
       fs.mkdirSync(thumbnailDir, { recursive: true });

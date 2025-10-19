@@ -11,6 +11,7 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname } from 'path';
+import * as fs from 'fs';
 import { FileService } from './file.service';
 
 @Controller('file')
@@ -23,7 +24,18 @@ export class FileController {
   @UseInterceptors(
     FileInterceptor('file', {
       storage: diskStorage({
-        destination: './uploads/temp',
+        destination: (req, file, cb) => {
+          const uploadPath = process.env.UPLOAD_PATH || './uploads';
+          const tempDir = `${uploadPath}/temp`;
+          
+          // 디렉토리가 없으면 생성
+          if (!fs.existsSync(tempDir)) {
+            fs.mkdirSync(tempDir, { recursive: true, mode: 0o755 });
+            console.log(`📁 디렉토리 생성: ${tempDir}`);
+          }
+          
+          cb(null, tempDir);
+        },
         filename: (req, file, cb) => {
           const randomName = Array(32)
             .fill(null)
@@ -136,7 +148,7 @@ export class FileController {
       fileId,
       fileName,
       fileType,
-      fileUrl: `/uploads/${fileType}/${fileName}`,
+      fileUrl: `/uploads/${fileType}/${fileName}`, // URL 경로는 항상 /uploads로 고정
       originalName: file.originalname,
       size: file.size,
       message: 'File uploaded successfully, processing...',
@@ -156,7 +168,8 @@ export class FileController {
 
   @Get('serve/:type/:filename')
   async serveFile(@Param('type') type: string, @Param('filename') filename: string) {
-    const filePath = `./uploads/${type}/${filename}`;
+    const uploadPath = process.env.UPLOAD_PATH || './uploads';
+    const filePath = `${uploadPath}/${type}/${filename}`;
     
     // In production, you might want to use a proper file serving solution
     // like nginx or a CDN instead of serving files directly from Node.js

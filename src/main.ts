@@ -22,7 +22,14 @@ async function bootstrap() {
   });
   
   // 업로드된 파일 서빙 설정
-  app.useStaticAssets(join(__dirname, '..', 'uploads'), {
+  const uploadPath = process.env.UPLOAD_PATH || './uploads';
+  const uploadsDir = uploadPath.startsWith('.') 
+    ? join(__dirname, '..', uploadPath) 
+    : uploadPath;
+  
+  console.log(`📤 업로드 경로: ${uploadsDir}`);
+  
+  app.useStaticAssets(uploadsDir, {
     prefix: '/uploads/',
     maxAge: '7d',
     etag: true,
