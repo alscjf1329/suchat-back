@@ -5,7 +5,7 @@ import { User } from '../entities/user.entity';
 
 export interface IUserRepository {
   create(userData: Partial<User>): Promise<User>;
-  findByEmail(email: string): Promise<User | null>;
+  findByEmail(email: string, withPassword?: boolean): Promise<User | null>;
   findById(id: string): Promise<User | null>;
   findAll(): Promise<User[]>;
   update(id: string, userData: Partial<User>): Promise<User>;
@@ -25,7 +25,14 @@ export class PostgresUserRepository implements IUserRepository {
     return await this.userRepository.save(user);
   }
 
-  async findByEmail(email: string): Promise<User | null> {
+  async findByEmail(email: string, withPassword: boolean = false): Promise<User | null> {
+    if (withPassword) {
+      // 로그인 시 password 필드 필요
+      return await this.userRepository.findOne({ 
+        where: { email },
+        select: ['id', 'name', 'email', 'password', 'phone', 'birthday', 'isActive', 'lastLoginAt', 'createdAt', 'updatedAt']
+      });
+    }
     return await this.userRepository.findOne({ where: { email } });
   }
 
@@ -93,7 +100,7 @@ export class MemoryUserRepository implements IUserRepository {
     return user;
   }
 
-  async findByEmail(email: string): Promise<User | null> {
+  async findByEmail(email: string, withPassword: boolean = false): Promise<User | null> {
     return this.users.find(user => user.email === email) || null;
   }
 

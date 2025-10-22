@@ -25,10 +25,23 @@ export class UserService {
   ): Promise<{ accessToken: string; refreshToken: string; user: User }> {
     this.logger.log(`SignIn attempt for email: ${email} (device: ${deviceType})`);
     
-    const user = await this.userRepository.findByEmail(email);
+    // 입력값 검증
+    if (!email || !password) {
+      this.logger.warn(`SignIn failed: Missing email or password`);
+      throw new UnauthorizedException('이메일과 비밀번호를 입력해주세요');
+    }
+    
+    // 로그인 시 password 포함하여 조회
+    const user = await this.userRepository.findByEmail(email, true);
     if (!user) {
       this.logger.warn(`SignIn failed: User not found - ${email}`);
       throw new UnauthorizedException('Invalid credentials');
+    }
+
+    // 비밀번호 필드 검증
+    if (!user.password) {
+      this.logger.error(`SignIn failed: User password is undefined - ${email}`);
+      throw new UnauthorizedException('계정 정보가 올바르지 않습니다');
     }
 
     const isPasswordValid = await bcrypt.compare(password, user.password);
