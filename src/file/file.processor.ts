@@ -83,6 +83,7 @@ export class FileProcessor {
   private async processImage(inputPath: string, outputPath: string) {
     // Resize and optimize image
     await sharp(inputPath)
+      .rotate() // 📱 EXIF orientation 자동 적용 (휴대폰 사진 회전 문제 해결)
       .resize(1920, 1080, { 
         fit: 'inside',
         withoutEnlargement: true 
@@ -102,6 +103,7 @@ export class FileProcessor {
     const thumbnailPath = path.join(thumbnailDir, `${fileId}_thumb.jpg`);
     
     await sharp(imagePath)
+      .rotate() // 📱 EXIF orientation 자동 적용 (휴대폰 사진 회전 문제 해결)
       .resize(300, 300, { 
         fit: 'cover' 
       })
