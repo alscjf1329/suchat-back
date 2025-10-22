@@ -336,4 +336,21 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
     this.logger.log(`[get_or_create_dm] DM 준비 완료: roomId=${room.id}`);
     return room;
   }
+
+  @SubscribeMessage('load_more_messages')
+  async handleLoadMoreMessages(
+    @MessageBody() data: { roomId: string; cursor: { timestamp: Date; id: string }; limit?: number },
+    @ConnectedSocket() client: Socket,
+  ) {
+    const { roomId, cursor, limit = 50 } = data;
+    this.logger.log(`[load_more_messages] 과거 메시지 로드: roomId=${roomId}, cursorId=${cursor.id}, limit=${limit}`);
+    
+    const messages = await this.chatService.getRoomMessages(roomId, limit, cursor);
+    this.logger.debug(`[load_more_messages] ${messages.length}개 메시지 로드됨`);
+    
+    return {
+      messages,
+      hasMore: messages.length === limit, // limit만큼 로드됐으면 더 있을 가능성
+    };
+  }
 }

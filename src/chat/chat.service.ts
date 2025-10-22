@@ -24,8 +24,8 @@ export class ChatService {
     return await this.chatRepository.sendMessage(messageData);
   }
 
-  async getRoomMessages(roomId: string, limit = 50): Promise<Message[]> {
-    return await this.chatRepository.getRoomMessages(roomId, limit);
+  async getRoomMessages(roomId: string, limit = 50, cursor?: { timestamp: Date; id: string }): Promise<Message[]> {
+    return await this.chatRepository.getRoomMessages(roomId, limit, cursor);
   }
 
   async getRoom(roomId: string): Promise<ChatRoom | null> {
