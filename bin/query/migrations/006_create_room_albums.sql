@@ -2,10 +2,11 @@
 -- 작성일: 2025-10-22
 -- 설명: 채팅방 멤버들이 공유하는 사진/동영상을 폴더별로 관리
 
--- 1. 폴더 테이블 생성
+-- 1. 폴더 테이블 생성 (트리 구조 지원)
 CREATE TABLE IF NOT EXISTS room_album_folders (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   "roomId" UUID NOT NULL,
+  "parentId" UUID,
   name VARCHAR(100) NOT NULL,
   description TEXT,
   "createdBy" UUID NOT NULL,
@@ -15,7 +16,9 @@ CREATE TABLE IF NOT EXISTS room_album_folders (
   CONSTRAINT fk_room_album_folders_room FOREIGN KEY ("roomId") 
     REFERENCES chat_rooms(id) ON DELETE CASCADE,
   CONSTRAINT fk_room_album_folders_user FOREIGN KEY ("createdBy") 
-    REFERENCES users(id) ON DELETE CASCADE
+    REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_room_album_folders_parent FOREIGN KEY ("parentId") 
+    REFERENCES room_album_folders(id) ON DELETE CASCADE
 );
 
 -- 2. 사진첩 테이블 생성
@@ -52,6 +55,9 @@ CREATE INDEX IF NOT EXISTS idx_room_albums_uploader
 
 CREATE INDEX IF NOT EXISTS idx_room_album_folders_room 
   ON room_album_folders("roomId");
+
+CREATE INDEX IF NOT EXISTS idx_room_album_folders_parent 
+  ON room_album_folders("parentId");
 
 -- 코멘트 추가
 COMMENT ON TABLE room_album_folders IS '사진첩 폴더';

@@ -24,12 +24,12 @@ export class ChatAlbumController {
   @Post(':roomId/folders')
   async createFolder(
     @Param('roomId') roomId: string,
-    @Body() data: { name: string; description?: string },
+    @Body() data: { name: string; description?: string; parentId?: string },
     @Request() req,
   ) {
-    this.logger.log(`[createFolder] 폴더 생성: roomId=${roomId}, name=${data.name}, userId=${req.user.userId}`);
+    this.logger.log(`[createFolder] 폴더 생성: roomId=${roomId}, name=${data.name}, parentId=${data.parentId || 'root'}, userId=${req.user.userId}`);
     this.logger.debug(`[createFolder] 요청 데이터:`, data);
-    const folder = await this.albumService.createFolder(roomId, req.user.userId, data.name, data.description);
+    const folder = await this.albumService.createFolder(roomId, req.user.userId, data.name, data.description, data.parentId);
     this.logger.log(`[createFolder] 폴더 생성 완료: folderId=${folder.id}`);
     return folder;
   }

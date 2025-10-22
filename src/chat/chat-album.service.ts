@@ -65,24 +65,32 @@ export class ChatAlbumService {
     await this.albumRepository.delete(albumId);
   }
 
-  // 폴더 목록 조회
+  // 폴더 목록 조회 (트리 구조)
   async getFolders(roomId: string): Promise<RoomAlbumFolder[]> {
     this.logger.debug(`[getFolders] 폴더 조회: roomId=${roomId}`);
     const folders = await this.folderRepository.find({
       where: { roomId },
       order: { createdAt: 'ASC' },
+      relations: ['children'],
     });
     this.logger.log(`[getFolders] ${folders.length}개 폴더 조회됨`);
     return folders;
   }
 
   // 폴더 생성
-  async createFolder(roomId: string, createdBy: string, name: string, description?: string): Promise<RoomAlbumFolder> {
+  async createFolder(
+    roomId: string, 
+    createdBy: string, 
+    name: string, 
+    description?: string,
+    parentId?: string
+  ): Promise<RoomAlbumFolder> {
     const folder = this.folderRepository.create({
       roomId,
       createdBy,
       name,
       description,
+      parentId,
     });
     return await this.folderRepository.save(folder);
   }

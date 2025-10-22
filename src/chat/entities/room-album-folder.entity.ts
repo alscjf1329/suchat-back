@@ -10,6 +10,9 @@ export class RoomAlbumFolder {
   @Column({ type: 'uuid' })
   roomId: string;
 
+  @Column({ type: 'uuid', nullable: true })
+  parentId?: string; // 상위 폴더 ID (null이면 루트)
+
   @Column({ type: 'varchar', length: 100 })
   name: string; // 폴더명
 
@@ -25,6 +28,13 @@ export class RoomAlbumFolder {
   @ManyToOne(() => ChatRoom)
   @JoinColumn({ name: 'roomId' })
   room: ChatRoom;
+
+  @ManyToOne(() => RoomAlbumFolder, { nullable: true })
+  @JoinColumn({ name: 'parentId' })
+  parent?: RoomAlbumFolder;
+
+  @OneToMany(() => RoomAlbumFolder, folder => folder.parent)
+  children: RoomAlbumFolder[];
 
   @OneToMany(() => RoomAlbum, album => album.folder)
   albums: RoomAlbum[];
