@@ -18,10 +18,10 @@ export class Message {
 
   @Column({ 
     type: 'enum', 
-    enum: ['text', 'image', 'video', 'file'],
+    enum: ['text', 'image', 'video', 'file', 'images'],
     default: 'text'
   })
-  type: 'text' | 'image' | 'video' | 'file';
+  type: 'text' | 'image' | 'video' | 'file' | 'images';
 
   @Column({ nullable: true })
   fileUrl?: string;
@@ -31,6 +31,15 @@ export class Message {
 
   @Column({ nullable: true })
   fileSize?: number;
+
+  // 여러 파일을 위한 JSON 필드
+  @Column({ type: 'json', nullable: true })
+  files?: Array<{
+    fileUrl: string;
+    fileName: string;
+    fileSize: number;
+    thumbnailUrl?: string;
+  }>;
 
   @CreateDateColumn()
   timestamp: Date;

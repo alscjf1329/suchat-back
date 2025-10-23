@@ -196,6 +196,19 @@ USE_MEMORY_DB=false
 - **비디오**: MP4, WebM, **MOV** (아이폰), M4V
 - **문서**: PDF, DOC, DOCX
 
+### 채팅 앨범 (Chat Album)
+- `GET /chat/album/:roomId` - 채팅방 사진첩 조회
+- `POST /chat/album/:roomId` - 사진첩에 파일 추가
+- `DELETE /chat/album/:albumId` - 사진첩에서 파일 삭제
+- `GET /chat/album/:roomId/folders` - 폴더 목록 조회
+- `POST /chat/album/:roomId/folders` - 폴더 생성
+- `GET /chat/album/:roomId/folders/:folderId` - 폴더별 사진 조회
+- `DELETE /chat/album/:roomId/folders/:folderId` - 폴더 삭제
+
+#### 파일 업로드 용도 구분
+- **채팅 메시지**: `/file/upload` → `messages` 테이블에 저장 (실시간 전송)
+- **사진첩**: `/file/upload` + `/chat/album/:roomId` → `room_albums` 테이블에 저장 (추억 정리)
+
 ### WebSocket 이벤트
 - `join_room` - 채팅방 참여
 - `leave_room` - 채팅방 퇴장
@@ -206,7 +219,7 @@ USE_MEMORY_DB=false
 
 ## 🗄️ 데이터베이스 스키마
 
-**전체 테이블: 8개**
+**전체 테이블: 10개**
 
 ### 주요 테이블
 - `users` - 사용자 정보
@@ -214,7 +227,9 @@ USE_MEMORY_DB=false
 - `refresh_tokens` - JWT 리프레시 토큰
 - `chat_rooms` - 채팅방 메타데이터
 - `chat_room_participants` - 채팅방 참여자 정보
-- `messages` - 채팅 메시지
+- `messages` - 채팅 메시지 (실시간 전송용)
+- `room_albums` - 채팅방 사진첩 (추억 정리용)
+- `room_album_folders` - 사진첩 폴더 구조
 - `friends` - 친구 관계
 - `push_subscriptions` - 푸시 알림 구독 (사용자당 1개)
 
@@ -222,6 +237,7 @@ USE_MEMORY_DB=false
 
 ## 🔄 파일 처리 워크플로우
 
+### 공통 파일 업로드 프로세스
 1. **업로드**: 클라이언트가 파일을 `/file/upload`로 전송
 2. **임시 저장**: 파일을 `uploads/temp/`에 임시 저장
 3. **큐 작업**: Bull Queue에 파일 처리 작업 추가
@@ -231,6 +247,10 @@ USE_MEMORY_DB=false
    - 썸네일 생성 (300x300)
    - 최종 디렉토리로 이동
 5. **완료**: 처리된 파일 정보 반환
+
+### 용도별 분기 처리
+- **채팅 메시지**: 파일 처리 완료 후 `socketClient.sendMessage()` 호출하여 실시간 전송
+- **사진첩**: 파일 처리 완료 후 `/chat/album/:roomId` API 호출하여 사진첩에 저장
 
 ### 아이폰 이미지 처리 특징
 - **HEIC/HEIF 형식 자동 변환**: 아이폰에서 촬영한 HEIC/HEIF 이미지를 JPEG로 자동 변환
