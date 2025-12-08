@@ -103,7 +103,7 @@ export class ChatAlbumService {
     });
   }
 
-  // 폴더 삭제 (본인만 가능)
+  // 폴더 삭제 (본인만 가능, 하위 폴더도 함께 삭제)
   async deleteFolder(folderId: string, userId: string): Promise<void> {
     const folder = await this.folderRepository.findOne({
       where: { id: folderId },
@@ -118,6 +118,9 @@ export class ChatAlbumService {
       throw new ForbiddenException('본인이 생성한 폴더만 삭제할 수 있습니다.');
     }
 
+    // 재귀적으로 하위 폴더들도 함께 삭제
+    await this.deleteFolderRecursive(folderId, userId);
+
     // 폴더 내 파일들을 루트로 이동 (folderId를 제거)
     await this.albumRepository
       .createQueryBuilder()
@@ -128,6 +131,34 @@ export class ChatAlbumService {
 
     // 폴더 삭제
     await this.folderRepository.delete(folderId);
+  }
+
+  // 재귀적으로 하위 폴더 삭제
+  private async deleteFolderRecursive(folderId: string, userId: string): Promise<void> {
+    // 하위 폴더들 조회
+    const childFolders = await this.folderRepository.find({
+      where: { parentId: folderId },
+    });
+
+    // 각 하위 폴더에 대해 재귀적으로 삭제
+    for (const childFolder of childFolders) {
+      // 본인이 생성한 폴더만 삭제 가능
+      if (childFolder.createdBy === userId) {
+        // 하위 폴더의 하위 폴더들도 재귀적으로 삭제
+        await this.deleteFolderRecursive(childFolder.id, userId);
+
+        // 하위 폴더 내 파일들을 루트로 이동
+        await this.albumRepository
+          .createQueryBuilder()
+          .update(RoomAlbum)
+          .set({ folderId: () => 'NULL' })
+          .where('folderId = :childFolderId', { childFolderId: childFolder.id })
+          .execute();
+
+        // 하위 폴더 삭제
+        await this.folderRepository.delete(childFolder.id);
+      }
+    }
   }
 }
 
