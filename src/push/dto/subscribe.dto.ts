@@ -16,6 +16,18 @@ export class SubscribePushDto {
   @IsString()
   auth: string;
 
+  @IsNotEmpty()
+  @IsString()
+  deviceId: string; // 기기 고유 ID
+
+  @IsNotEmpty()
+  @IsString()
+  deviceType: string; // 'ios', 'android', 'desktop', 'tablet'
+
+  @IsOptional()
+  @IsString()
+  deviceName?: string; // 기기 이름
+
   @IsOptional()
   @IsString()
   userAgent?: string;

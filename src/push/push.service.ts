@@ -38,34 +38,39 @@ export class PushService implements OnModuleInit {
 
   /**
    * 푸시 구독 등록 (UPSERT)
-   * userId별로 하나의 구독만 유지 (최신 디바이스로 업데이트)
+   * userId와 deviceId 조합으로 여러 기기 지원
    */
   async subscribe(userId: string, subscribeDto: SubscribePushDto) {
-    const { endpoint, p256dh, auth, userAgent } = subscribeDto;
+    const { endpoint, p256dh, auth, deviceId, deviceType, deviceName, userAgent } = subscribeDto;
 
-    // 기존 구독 확인 (userId 기준)
+    // 기존 구독 확인 (userId + deviceId 조합)
     let subscription = await this.pushSubscriptionRepository.findOne({
-      where: { userId },
+      where: { userId, deviceId },
     });
 
     if (subscription) {
-      // 기존 구독 업데이트 (최신 디바이스로 교체)
+      // 기존 구독 업데이트 (같은 기기의 새 구독 정보로 업데이트)
       subscription.endpoint = endpoint;
       subscription.p256dh = p256dh;
       subscription.auth = auth;
+      subscription.deviceType = deviceType;
+      subscription.deviceName = deviceName;
       subscription.userAgent = userAgent;
       subscription.isActive = true;
-      this.logger.log(`🔄 Push subscription updated for user: ${userId}`);
+      this.logger.log(`🔄 Push subscription updated for user: ${userId}, device: ${deviceId} (${deviceType})`);
     } else {
       // 새 구독 생성
       subscription = this.pushSubscriptionRepository.create({
         userId,
+        deviceId,
+        deviceType,
+        deviceName,
         endpoint,
         p256dh,
         auth,
         userAgent,
       });
-      this.logger.log(`✅ Push subscription created for user: ${userId}`);
+      this.logger.log(`✅ Push subscription created for user: ${userId}, device: ${deviceId} (${deviceType})`);
     }
 
     await this.pushSubscriptionRepository.save(subscription);
@@ -73,19 +78,21 @@ export class PushService implements OnModuleInit {
     return {
       success: true,
       subscriptionId: subscription.id,
+      deviceId: subscription.deviceId,
+      deviceType: subscription.deviceType,
     };
   }
 
   /**
    * 푸시 구독 해제
    */
-  async unsubscribe(userId: string, endpoint: string) {
+  async unsubscribe(userId: string, deviceId: string) {
     const result = await this.pushSubscriptionRepository.update(
-      { userId, endpoint },
+      { userId, deviceId },
       { isActive: false },
     );
 
-    this.logger.log(`🔕 Push subscription disabled for user: ${userId}`);
+    this.logger.log(`🔕 Push subscription disabled for user: ${userId}, device: ${deviceId}`);
     return { success: (result.affected ?? 0) > 0 };
   }
 
@@ -177,6 +184,29 @@ export class PushService implements OnModuleInit {
       total: subscriptions.length,
       successCount,
       failedCount: subscriptions.length - successCount,
+    };
+  }
+
+  /**
+   * 기기 이름 업데이트
+   */
+  async updateDeviceName(userId: string, deviceId: string, deviceName: string) {
+    const subscription = await this.pushSubscriptionRepository.findOne({
+      where: { userId, deviceId },
+    });
+
+    if (!subscription) {
+      throw new Error('Device not found');
+    }
+
+    subscription.deviceName = deviceName;
+    await this.pushSubscriptionRepository.save(subscription);
+
+    this.logger.log(`📝 Device name updated: ${userId} - ${deviceId} -> ${deviceName}`);
+    return {
+      success: true,
+      deviceId: subscription.deviceId,
+      deviceName: subscription.deviceName,
     };
   }
 

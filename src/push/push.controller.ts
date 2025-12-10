@@ -2,11 +2,13 @@ import {
   Controller,
   Post,
   Delete,
+  Put,
   Body,
   UseGuards,
   Request,
   HttpCode,
   Get,
+  Param,
 } from '@nestjs/common';
 import { PushService } from './push.service';
 import { SubscribePushDto } from './dto/subscribe.dto';
@@ -37,9 +39,9 @@ export class PushController {
    */
   @Delete('unsubscribe')
   @HttpCode(200)
-  async unsubscribe(@Request() req, @Body('endpoint') endpoint: string) {
+  async unsubscribe(@Request() req, @Body('deviceId') deviceId: string) {
     const userId = req.user.userId;
-    return this.pushService.unsubscribe(userId, endpoint);
+    return this.pushService.unsubscribe(userId, deviceId);
   }
 
   /**
@@ -66,11 +68,42 @@ export class PushController {
       count: subscriptions.length,
       subscriptions: subscriptions.map((sub) => ({
         id: sub.id,
+        deviceId: sub.deviceId,
+        deviceType: sub.deviceType,
+        deviceName: sub.deviceName,
         endpoint: sub.endpoint.substring(0, 50) + '...', // 보안상 일부만
         userAgent: sub.userAgent,
+        isActive: sub.isActive,
         createdAt: sub.createdAt,
+        updatedAt: sub.updatedAt,
       })),
     };
+  }
+
+  /**
+   * 기기 이름 업데이트
+   * PUT /push/subscriptions/:deviceId/name
+   */
+  @Put('subscriptions/:deviceId/name')
+  @HttpCode(200)
+  async updateDeviceName(
+    @Request() req,
+    @Param('deviceId') deviceId: string,
+    @Body('deviceName') deviceName: string,
+  ) {
+    const userId = req.user.userId;
+    return this.pushService.updateDeviceName(userId, deviceId, deviceName);
+  }
+
+  /**
+   * 특정 기기 로그아웃 (구독 해제)
+   * DELETE /push/subscriptions/:deviceId
+   */
+  @Delete('subscriptions/:deviceId')
+  @HttpCode(200)
+  async logoutDevice(@Request() req, @Param('deviceId') deviceId: string) {
+    const userId = req.user.userId;
+    return this.pushService.unsubscribe(userId, deviceId);
   }
 }
 
