@@ -168,11 +168,12 @@ export class PushService implements OnModuleInit {
   }
 
   /**
-   * 사용자의 모든 활성 구독 조회
+   * 사용자의 모든 구독 조회 (활성/비활성 모두)
    */
   async getUserSubscriptions(userId: string) {
     return this.pushSubscriptionRepository.find({
-      where: { userId, isActive: true },
+      where: { userId },
+      order: { updatedAt: 'DESC' }, // 최근 업데이트된 순서로 정렬
     });
   }
 
