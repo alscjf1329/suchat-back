@@ -43,44 +43,115 @@ export class PushService implements OnModuleInit {
   async subscribe(userId: string, subscribeDto: SubscribePushDto) {
     const { endpoint, p256dh, auth, deviceId, deviceType, deviceName, userAgent } = subscribeDto;
 
-    // 기존 구독 확인 (userId + deviceId 조합)
-    let subscription = await this.pushSubscriptionRepository.findOne({
-      where: { userId, deviceId },
-    });
-
-    if (subscription) {
-      // 기존 구독 업데이트 (같은 기기의 새 구독 정보로 업데이트)
-      subscription.endpoint = endpoint;
-      subscription.p256dh = p256dh;
-      subscription.auth = auth;
-      subscription.deviceType = deviceType;
-      subscription.deviceName = deviceName;
-      subscription.userAgent = userAgent;
-      subscription.isActive = true;
-      this.logger.log(`🔄 Push subscription updated for user: ${userId}, device: ${deviceId} (${deviceType})`);
-    } else {
-      // 새 구독 생성
-      subscription = this.pushSubscriptionRepository.create({
-        userId,
-        deviceId,
-        deviceType,
-        deviceName,
-        endpoint,
-        p256dh,
-        auth,
-        userAgent,
+    try {
+      // 기존 구독 확인 (userId + deviceId 조합)
+      let subscription = await this.pushSubscriptionRepository.findOne({
+        where: { userId, deviceId },
       });
-      this.logger.log(`✅ Push subscription created for user: ${userId}, device: ${deviceId} (${deviceType})`);
+
+      if (subscription) {
+        // 기존 구독 업데이트 (같은 기기의 새 구독 정보로 업데이트)
+        subscription.endpoint = endpoint;
+        subscription.p256dh = p256dh;
+        subscription.auth = auth;
+        subscription.deviceType = deviceType;
+        subscription.deviceName = deviceName;
+        subscription.userAgent = userAgent;
+        subscription.isActive = true;
+        this.logger.log(`🔄 Push subscription updated for user: ${userId}, device: ${deviceId} (${deviceType})`);
+      } else {
+        // deviceId가 없거나 기존 레코드가 없는 경우, userId만으로도 확인 (레거시 지원)
+        if (!deviceId) {
+          const existingByUserId = await this.pushSubscriptionRepository.findOne({
+            where: { userId },
+          });
+          
+          if (existingByUserId) {
+            // 기존 레코드 업데이트 (deviceId 추가)
+            subscription = existingByUserId;
+            subscription.endpoint = endpoint;
+            subscription.p256dh = p256dh;
+            subscription.auth = auth;
+            subscription.deviceId = deviceId || `device-${Date.now()}`;
+            subscription.deviceType = deviceType;
+            subscription.deviceName = deviceName;
+            subscription.userAgent = userAgent;
+            subscription.isActive = true;
+            this.logger.log(`🔄 Push subscription updated (legacy) for user: ${userId}`);
+          } else {
+            // 새 구독 생성
+            subscription = this.pushSubscriptionRepository.create({
+              userId,
+              deviceId: deviceId || `device-${Date.now()}`,
+              deviceType,
+              deviceName,
+              endpoint,
+              p256dh,
+              auth,
+              userAgent,
+            });
+            this.logger.log(`✅ Push subscription created for user: ${userId}, device: ${deviceId || 'auto-generated'} (${deviceType})`);
+          }
+        } else {
+          // 새 구독 생성
+          subscription = this.pushSubscriptionRepository.create({
+            userId,
+            deviceId,
+            deviceType,
+            deviceName,
+            endpoint,
+            p256dh,
+            auth,
+            userAgent,
+          });
+          this.logger.log(`✅ Push subscription created for user: ${userId}, device: ${deviceId} (${deviceType})`);
+        }
+      }
+
+      await this.pushSubscriptionRepository.save(subscription);
+
+      return {
+        success: true,
+        subscriptionId: subscription.id,
+        deviceId: subscription.deviceId,
+        deviceType: subscription.deviceType,
+      };
+    } catch (error) {
+      // Unique constraint 에러 처리 (userId 중복)
+      if (error.code === '23505' && error.constraint === 'push_subscriptions_userId_key') {
+        this.logger.warn(`⚠️  Duplicate userId detected, attempting to update existing subscription: ${userId}`);
+        
+        // 기존 레코드를 찾아서 업데이트
+        const existing = await this.pushSubscriptionRepository.findOne({
+          where: { userId },
+        });
+
+        if (existing) {
+          existing.endpoint = endpoint;
+          existing.p256dh = p256dh;
+          existing.auth = auth;
+          existing.deviceId = deviceId || existing.deviceId || `device-${Date.now()}`;
+          existing.deviceType = deviceType || existing.deviceType;
+          existing.deviceName = deviceName || existing.deviceName;
+          existing.userAgent = userAgent || existing.userAgent;
+          existing.isActive = true;
+          
+          await this.pushSubscriptionRepository.save(existing);
+          
+          this.logger.log(`🔄 Push subscription updated (from duplicate error) for user: ${userId}`);
+          
+          return {
+            success: true,
+            subscriptionId: existing.id,
+            deviceId: existing.deviceId,
+            deviceType: existing.deviceType,
+          };
+        }
+      }
+      
+      // 다른 에러는 그대로 throw
+      throw error;
     }
-
-    await this.pushSubscriptionRepository.save(subscription);
-
-    return {
-      success: true,
-      subscriptionId: subscription.id,
-      deviceId: subscription.deviceId,
-      deviceType: subscription.deviceType,
-    };
   }
 
   /**
