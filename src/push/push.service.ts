@@ -171,10 +171,19 @@ export class PushService implements OnModuleInit {
    * 사용자의 모든 구독 조회 (활성/비활성 모두)
    */
   async getUserSubscriptions(userId: string) {
-    return this.pushSubscriptionRepository.find({
+    this.logger.log(`🔍 [PushService] getUserSubscriptions 호출 - userId: ${userId}`);
+    
+    const subscriptions = await this.pushSubscriptionRepository.find({
       where: { userId },
       order: { updatedAt: 'DESC' }, // 최근 업데이트된 순서로 정렬
     });
+    
+    this.logger.log(`📱 [PushService] 조회 결과: ${subscriptions.length}개 구독 발견`);
+    subscriptions.forEach((sub, index) => {
+      this.logger.log(`  ${index + 1}. id: ${sub.id}, deviceId: ${sub.deviceId}, deviceType: ${sub.deviceType}, isActive: ${sub.isActive}`);
+    });
+    
+    return subscriptions;
   }
 
   /**

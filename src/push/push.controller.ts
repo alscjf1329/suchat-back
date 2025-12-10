@@ -61,13 +61,21 @@ export class PushController {
    */
   @Get('subscriptions')
   async getMySubscriptions(@Request() req) {
-    const userId = req.user.userId;
+    const userId = req.user?.userId || req.user?.id;
+    
+    if (!userId) {
+      console.error('❌ [PushController] userId를 찾을 수 없음:', req.user);
+      throw new Error('User ID not found');
+    }
+    
+    console.log(`📱 [PushController] 구독 목록 조회 요청 - userId: ${userId}, 전체 user 객체:`, JSON.stringify(req.user));
+    
     const subscriptions = await this.pushService.getUserSubscriptions(userId);
     
     // 로깅 추가 (디버깅용)
     console.log(`📱 [PushController] 사용자 ${userId}의 구독 목록: ${subscriptions.length}개`);
     subscriptions.forEach((sub, index) => {
-      console.log(`  ${index + 1}. deviceId: ${sub.deviceId}, deviceName: ${sub.deviceName}, isActive: ${sub.isActive}, updatedAt: ${sub.updatedAt}`);
+      console.log(`  ${index + 1}. deviceId: ${sub.deviceId}, deviceName: ${sub.deviceName}, deviceType: ${sub.deviceType}, isActive: ${sub.isActive}, updatedAt: ${sub.updatedAt}`);
     });
     
     return {

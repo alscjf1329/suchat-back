@@ -79,8 +79,49 @@ export class AuthController {
     @Body('email') email: string,
     @Body('password') password: string,
     @Body('deviceType') deviceType?: 'mobile' | 'desktop',
+    @Body('deviceId') deviceId?: string,
+    @Body('deviceName') deviceName?: string,
+    @Body('userAgent') userAgent?: string,
+    @Request() req?: any,
   ) {
-    const result = await this.userService.signIn(email, password, deviceType || 'desktop');
+    // userAgent에서 플랫폼 감지
+    const ua = userAgent || req?.headers?.['user-agent'] || '';
+    let platformType: 'ios' | 'android' | 'desktop' | 'tablet' = 'desktop';
+    
+    if (ua) {
+      const uaLower = ua.toLowerCase();
+      if (/iphone|ipod/i.test(ua)) {
+        platformType = 'ios';
+      } else if (/ipad/i.test(ua)) {
+        platformType = 'tablet';
+      } else if (/android/i.test(ua)) {
+        // Android 태블릿 감지
+        if (!/mobile/i.test(ua)) {
+          platformType = 'tablet';
+        } else {
+          platformType = 'android';
+        }
+      } else if (/tablet|ipad|playbook|silk/i.test(ua)) {
+        platformType = 'tablet';
+      } else {
+        platformType = 'desktop';
+      }
+    } else {
+      // userAgent가 없으면 deviceType으로 추정
+      platformType = deviceType === 'mobile' ? 'android' : 'desktop';
+    }
+
+    const result = await this.userService.signIn(
+      email, 
+      password, 
+      deviceType || 'desktop',
+      {
+        deviceId: deviceId || 'unknown',
+        deviceType: platformType,
+        deviceName: deviceName,
+        userAgent: ua,
+      }
+    );
     return { success: true, data: result };
   }
 

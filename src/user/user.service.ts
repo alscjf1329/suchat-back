@@ -1,10 +1,11 @@
-import { Injectable, Logger, UnauthorizedException, ConflictException, NotFoundException, Inject } from '@nestjs/common';
+import { Injectable, Logger, UnauthorizedException, ConflictException, NotFoundException, Inject, forwardRef } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { User } from './entities/user.entity';
 import type { IUserRepository } from './repositories/user.repository';
 import { Friend, FriendStatus } from './entities/friend.entity';
 import type { IFriendRepository } from './repositories/friend.repository';
 import { TokenService } from '../auth/services/token.service';
+import { DeviceService, DeviceInfo } from './device.service';
 
 @Injectable()
 export class UserService {
@@ -16,12 +17,15 @@ export class UserService {
     @Inject('IFriendRepository')
     private readonly friendRepository: IFriendRepository,
     private readonly tokenService: TokenService,
+    @Inject(forwardRef(() => DeviceService))
+    private readonly deviceService: DeviceService,
   ) {}
 
   async signIn(
     email: string, 
     password: string, 
-    deviceType: 'mobile' | 'desktop' = 'desktop'
+    deviceType: 'mobile' | 'desktop' = 'desktop',
+    deviceInfo?: DeviceInfo,
   ): Promise<{ accessToken: string; refreshToken: string; user: User }> {
     this.logger.log(`SignIn attempt for email: ${email} (device: ${deviceType})`);
     
@@ -48,6 +52,17 @@ export class UserService {
     if (!isPasswordValid) {
       this.logger.warn(`SignIn failed: Invalid password for user - ${email}`);
       throw new UnauthorizedException('Invalid credentials');
+    }
+
+    // 기기 정보 저장 (로그인 성공 후)
+    if (deviceInfo && deviceInfo.deviceId) {
+      try {
+        await this.deviceService.registerOrUpdateDevice(user.id, deviceInfo);
+        this.logger.log(`기기 정보 저장 완료 - deviceId: ${deviceInfo.deviceId}`);
+      } catch (error) {
+        this.logger.error(`기기 정보 저장 실패: ${error.message}`);
+        // 기기 정보 저장 실패해도 로그인은 계속 진행
+      }
     }
 
     // Access Token (디바이스별) + Refresh Token (7일) 생성
