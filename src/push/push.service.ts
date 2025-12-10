@@ -202,8 +202,10 @@ export class PushService implements OnModuleInit {
   async executePush(jobData: SendPushJobData) {
     const { userId, title, body, icon, badge, data, tag } = jobData;
 
-    // 사용자의 활성 구독 조회
-    const subscriptions = await this.getUserSubscriptions(userId);
+    // 사용자의 활성 구독만 조회 (푸시 발송용)
+    const subscriptions = await this.pushSubscriptionRepository.find({
+      where: { userId, isActive: true },
+    });
 
     if (subscriptions.length === 0) {
       this.logger.warn(`⚠️  No active subscriptions for user: ${userId}`);

@@ -64,6 +64,12 @@ export class PushController {
     const userId = req.user.userId;
     const subscriptions = await this.pushService.getUserSubscriptions(userId);
     
+    // 로깅 추가 (디버깅용)
+    console.log(`📱 [PushController] 사용자 ${userId}의 구독 목록: ${subscriptions.length}개`);
+    subscriptions.forEach((sub, index) => {
+      console.log(`  ${index + 1}. deviceId: ${sub.deviceId}, deviceName: ${sub.deviceName}, isActive: ${sub.isActive}, updatedAt: ${sub.updatedAt}`);
+    });
+    
     return {
       count: subscriptions.length,
       subscriptions: subscriptions.map((sub) => ({
