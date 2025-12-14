@@ -43,11 +43,28 @@ export class PushService implements OnModuleInit {
   async subscribe(userId: string, subscribeDto: SubscribePushDto) {
     const { endpoint, p256dh, auth, deviceId, deviceType, deviceName, userAgent } = subscribeDto;
 
+    this.logger.log(`📥 [subscribe] 요청 받음 - userId: ${userId}, deviceId: ${deviceId}, deviceType: ${deviceType}`);
+    
+    // 필수 필드 검증
+    if (!endpoint || !p256dh || !auth) {
+      this.logger.error(`❌ [subscribe] 필수 필드 누락 - endpoint: ${!!endpoint}, p256dh: ${!!p256dh}, auth: ${!!auth}`);
+      const error: any = new Error('필수 필드가 누락되었습니다: endpoint, p256dh, auth');
+      error.code = 'MISSING_REQUIRED_FIELDS';
+      error.status = 400;
+      throw error;
+    }
+
+    if (!deviceId) {
+      this.logger.warn(`⚠️  [subscribe] deviceId가 없음 - 자동 생성`);
+    }
+
     try {
       // 기존 구독 확인 (userId + deviceId 조합)
       let subscription = await this.pushSubscriptionRepository.findOne({
         where: { userId, deviceId },
       });
+
+      this.logger.log(`🔍 [subscribe] 기존 구독 조회 결과: ${subscription ? '존재함' : '없음'}`);
 
       if (subscription) {
         // 기존 구독 업데이트 (등록된 deviceId의 구독 정보 업데이트)
@@ -109,6 +126,7 @@ export class PushService implements OnModuleInit {
       }
 
       await this.pushSubscriptionRepository.save(subscription);
+      this.logger.log(`✅ [subscribe] 구독 저장 완료 - id: ${subscription.id}, deviceId: ${subscription.deviceId}`);
 
       return {
         success: true,
@@ -116,41 +134,127 @@ export class PushService implements OnModuleInit {
         deviceId: subscription.deviceId,
         deviceType: subscription.deviceType,
       };
-    } catch (error) {
-      // Unique constraint 에러 처리 (userId 중복)
-      if (error.code === '23505' && error.constraint === 'push_subscriptions_userId_key') {
-        this.logger.warn(`⚠️  Duplicate userId detected, attempting to update existing subscription: ${userId}`);
+    } catch (error: any) {
+      this.logger.error(`❌ [subscribe] 에러 발생:`, {
+        message: error.message,
+        code: error.code,
+        constraint: error.constraint,
+        stack: error.stack,
+      });
+      
+      // Unique constraint 에러 처리
+      if (error.code === '23505') {
+        this.logger.warn(`⚠️  [subscribe] Unique constraint 위반 - constraint: ${error.constraint}`);
         
-        // 기존 레코드를 찾아서 업데이트
-        const existing = await this.pushSubscriptionRepository.findOne({
-          where: { userId },
-        });
+        // (userId, deviceId) 조합 제약조건 위반인 경우
+        if (error.constraint === 'push_subscriptions_userId_deviceId_unique') {
+          this.logger.warn(`⚠️  Duplicate (userId, deviceId) detected, attempting to update: ${userId}, ${deviceId}`);
+          
+          // 기존 레코드를 찾아서 업데이트
+          const existing = await this.pushSubscriptionRepository.findOne({
+            where: { userId, deviceId },
+          });
 
-        if (existing) {
-          existing.endpoint = endpoint;
-          existing.p256dh = p256dh;
-          existing.auth = auth;
-          existing.deviceId = deviceId || existing.deviceId || `device-${Date.now()}`;
-          existing.deviceType = deviceType || existing.deviceType;
-          existing.deviceName = deviceName || existing.deviceName;
-          existing.userAgent = userAgent || existing.userAgent;
-          existing.isActive = true;
-          
-          await this.pushSubscriptionRepository.save(existing);
-          
-          this.logger.log(`🔄 Push subscription updated (from duplicate error) for user: ${userId}`);
-          
-          return {
-            success: true,
-            subscriptionId: existing.id,
-            deviceId: existing.deviceId,
-            deviceType: existing.deviceType,
-          };
+          if (existing) {
+            existing.endpoint = endpoint;
+            existing.p256dh = p256dh;
+            existing.auth = auth;
+            existing.deviceType = deviceType;
+            existing.deviceName = deviceName;
+            existing.userAgent = userAgent;
+            existing.isActive = true;
+            
+            await this.pushSubscriptionRepository.save(existing);
+            
+            this.logger.log(`🔄 Push subscription updated (from unique constraint error) for user: ${userId}, device: ${deviceId}`);
+            
+            return {
+              success: true,
+              subscriptionId: existing.id,
+              deviceId: existing.deviceId,
+              deviceType: existing.deviceType,
+            };
+          } else {
+            // 레코드를 찾을 수 없는 경우
+            const dbError: any = new Error('구독 정보를 찾을 수 없습니다.');
+            dbError.code = 'SUBSCRIPTION_NOT_FOUND';
+            dbError.status = 404;
+            throw dbError;
+          }
         }
+        
+        // userId 중복 (레거시)
+        if (error.constraint === 'push_subscriptions_userId_key') {
+          this.logger.warn(`⚠️  Duplicate userId detected, attempting to update existing subscription: ${userId}`);
+          
+          // 기존 레코드를 찾아서 업데이트
+          const existing = await this.pushSubscriptionRepository.findOne({
+            where: { userId },
+          });
+
+          if (existing) {
+            existing.endpoint = endpoint;
+            existing.p256dh = p256dh;
+            existing.auth = auth;
+            existing.deviceId = deviceId || existing.deviceId || `device-${Date.now()}`;
+            existing.deviceType = deviceType || existing.deviceType;
+            existing.deviceName = deviceName || existing.deviceName;
+            existing.userAgent = userAgent || existing.userAgent;
+            existing.isActive = true;
+            
+            await this.pushSubscriptionRepository.save(existing);
+            
+            this.logger.log(`🔄 Push subscription updated (from duplicate error) for user: ${userId}`);
+            
+            return {
+              success: true,
+              subscriptionId: existing.id,
+              deviceId: existing.deviceId,
+              deviceType: existing.deviceType,
+            };
+          } else {
+            // 레코드를 찾을 수 없는 경우
+            const dbError: any = new Error('구독 정보를 찾을 수 없습니다.');
+            dbError.code = 'SUBSCRIPTION_NOT_FOUND';
+            dbError.status = 404;
+            throw dbError;
+          }
+        }
+        
+        // 알 수 없는 Unique constraint 에러
+        const constraintError: any = new Error(`데이터베이스 제약조건 위반: ${error.constraint}`);
+        constraintError.code = 'DATABASE_CONSTRAINT_VIOLATION';
+        constraintError.status = 409;
+        constraintError.details = { constraint: error.constraint };
+        throw constraintError;
       }
       
-      // 다른 에러는 그대로 throw
-      throw error;
+      // 데이터베이스 연결 에러
+      if (error.code === 'ECONNREFUSED' || error.code === 'ETIMEDOUT') {
+        const dbError: any = new Error('데이터베이스 연결에 실패했습니다.');
+        dbError.code = 'DATABASE_CONNECTION_FAILED';
+        dbError.status = 503;
+        throw dbError;
+      }
+      
+      // 데이터베이스 쿼리 에러
+      if (error.code && error.code.startsWith('23')) {
+        const dbError: any = new Error('데이터베이스 오류가 발생했습니다.');
+        dbError.code = 'DATABASE_ERROR';
+        dbError.status = 500;
+        dbError.details = { dbCode: error.code, constraint: error.constraint };
+        throw dbError;
+      }
+      
+      // 다른 에러는 코드와 함께 throw
+      const enhancedError: any = error;
+      if (!enhancedError.code) {
+        enhancedError.code = 'PUSH_SUBSCRIPTION_FAILED';
+      }
+      if (!enhancedError.status) {
+        enhancedError.status = 500;
+      }
+      throw enhancedError;
     }
   }
 
@@ -279,7 +383,10 @@ export class PushService implements OnModuleInit {
     });
 
     if (!subscription) {
-      throw new Error('Device not found');
+      const error: any = new Error('기기를 찾을 수 없습니다.');
+      error.code = 'DEVICE_NOT_FOUND';
+      error.status = 404;
+      throw error;
     }
 
     subscription.deviceName = deviceName;

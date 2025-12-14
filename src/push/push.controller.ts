@@ -9,6 +9,8 @@ import {
   HttpCode,
   Get,
   Param,
+  HttpException,
+  HttpStatus,
 } from '@nestjs/common';
 import { PushService } from './push.service';
 import { SubscribePushDto } from './dto/subscribe.dto';
@@ -29,8 +31,25 @@ export class PushController {
   @Post('subscribe')
   @HttpCode(200)
   async subscribe(@Request() req, @Body() subscribeDto: SubscribePushDto) {
-    const userId = req.user.userId; // JWT에서 사용자 ID 추출
-    return this.pushService.subscribe(userId, subscribeDto);
+    try {
+      const userId = req.user.userId; // JWT에서 사용자 ID 추출
+      return await this.pushService.subscribe(userId, subscribeDto);
+    } catch (error: any) {
+      // 에러 코드와 메시지를 포함한 응답
+      const errorCode = error.code || 'PUSH_SUBSCRIPTION_FAILED';
+      const statusCode = error.status || HttpStatus.INTERNAL_SERVER_ERROR;
+      const errorMessage = error.message || '푸시 구독에 실패했습니다.';
+      
+      throw new HttpException(
+        {
+          success: false,
+          errorCode,
+          message: errorMessage,
+          details: error.details || null,
+        },
+        statusCode,
+      );
+    }
   }
 
   /**
