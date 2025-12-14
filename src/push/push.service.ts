@@ -54,20 +54,25 @@ export class PushService implements OnModuleInit {
       throw error;
     }
 
-    if (!deviceId) {
-      this.logger.warn(`⚠️  [subscribe] deviceId가 없음 - 자동 생성`);
+    // deviceId 필수 검증
+    if (!deviceId || deviceId.trim() === '') {
+      this.logger.error(`❌ [subscribe] deviceId가 필수입니다 - deviceId: ${deviceId}`);
+      const error: any = new Error('deviceId는 필수 필드입니다.');
+      error.code = 'MISSING_REQUIRED_FIELDS';
+      error.status = 400;
+      throw error;
     }
 
     try {
-      // 기존 구독 확인 (userId + deviceId 조합)
+      // 기존 구독 확인 (userId + deviceId 조합으로만 조회)
       let subscription = await this.pushSubscriptionRepository.findOne({
         where: { userId, deviceId },
       });
 
-      this.logger.log(`🔍 [subscribe] 기존 구독 조회 결과: ${subscription ? '존재함' : '없음'}`);
+      this.logger.log(`🔍 [subscribe] 기존 구독 조회 결과: ${subscription ? '존재함' : '없음'} - userId: ${userId}, deviceId: ${deviceId}`);
 
       if (subscription) {
-        // 기존 구독 업데이트 (등록된 deviceId의 구독 정보 업데이트)
+        // 기존 구독 업데이트 (동일한 deviceId의 구독 정보만 업데이트)
         subscription.endpoint = endpoint;
         subscription.p256dh = p256dh;
         subscription.auth = auth;
@@ -77,52 +82,18 @@ export class PushService implements OnModuleInit {
         subscription.isActive = true;
         this.logger.log(`🔄 [UPDATE] Push subscription updated for user: ${userId}, device: ${deviceId} (${deviceType})`);
       } else {
-        // deviceId가 없거나 기존 레코드가 없는 경우, userId만으로도 확인 (레거시 지원)
-        if (!deviceId) {
-          const existingByUserId = await this.pushSubscriptionRepository.findOne({
-            where: { userId },
-          });
-          
-          if (existingByUserId) {
-            // 기존 레코드 업데이트 (deviceId 추가)
-            subscription = existingByUserId;
-            subscription.endpoint = endpoint;
-            subscription.p256dh = p256dh;
-            subscription.auth = auth;
-            subscription.deviceId = deviceId || `device-${Date.now()}`;
-            subscription.deviceType = deviceType;
-            subscription.deviceName = deviceName;
-            subscription.userAgent = userAgent;
-            subscription.isActive = true;
-            this.logger.log(`🔄 Push subscription updated (legacy) for user: ${userId}`);
-          } else {
-            // 새 구독 생성 (등록되지 않은 deviceId)
-            subscription = this.pushSubscriptionRepository.create({
-              userId,
-              deviceId: deviceId || `device-${Date.now()}`,
-              deviceType,
-              deviceName,
-              endpoint,
-              p256dh,
-              auth,
-              userAgent,
-            });
-            this.logger.log(`✅ [CREATE] Push subscription created for user: ${userId}, device: ${deviceId || 'auto-generated'} (${deviceType})`);
-          }
-        } else {
-          // 새 구독 생성 (등록되지 않은 deviceId)
-          subscription = this.pushSubscriptionRepository.create({
-            userId,
-            deviceId,
-            deviceType,
-            deviceName,
-            endpoint,
-            p256dh,
-            auth,
-            userAgent,
-          });
-          this.logger.log(`✅ [CREATE] Push subscription created for user: ${userId}, device: ${deviceId} (${deviceType})`);
-        }
+        // 새 구독 생성 (등록되지 않은 deviceId)
+        subscription = this.pushSubscriptionRepository.create({
+          userId,
+          deviceId,
+          deviceType,
+          deviceName,
+          endpoint,
+          p256dh,
+          auth,
+          userAgent,
+        });
+        this.logger.log(`✅ [CREATE] Push subscription created for user: ${userId}, device: ${deviceId} (${deviceType})`);
       }
 
       await this.pushSubscriptionRepository.save(subscription);
@@ -183,42 +154,13 @@ export class PushService implements OnModuleInit {
           }
         }
         
-        // userId 중복 (레거시)
+        // userId 중복 (레거시) - 더 이상 지원하지 않음
         if (error.constraint === 'push_subscriptions_userId_key') {
-          this.logger.warn(`⚠️  Duplicate userId detected, attempting to update existing subscription: ${userId}`);
-          
-          // 기존 레코드를 찾아서 업데이트
-          const existing = await this.pushSubscriptionRepository.findOne({
-            where: { userId },
-          });
-
-          if (existing) {
-            existing.endpoint = endpoint;
-            existing.p256dh = p256dh;
-            existing.auth = auth;
-            existing.deviceId = deviceId || existing.deviceId || `device-${Date.now()}`;
-            existing.deviceType = deviceType || existing.deviceType;
-            existing.deviceName = deviceName || existing.deviceName;
-            existing.userAgent = userAgent || existing.userAgent;
-            existing.isActive = true;
-            
-            await this.pushSubscriptionRepository.save(existing);
-            
-            this.logger.log(`🔄 Push subscription updated (from duplicate error) for user: ${userId}`);
-            
-            return {
-              success: true,
-              subscriptionId: existing.id,
-              deviceId: existing.deviceId,
-              deviceType: existing.deviceType,
-            };
-          } else {
-            // 레코드를 찾을 수 없는 경우
-            const dbError: any = new Error('구독 정보를 찾을 수 없습니다.');
-            dbError.code = 'SUBSCRIPTION_NOT_FOUND';
-            dbError.status = 404;
-            throw dbError;
-          }
+          this.logger.error(`❌ [subscribe] 레거시 userId 제약조건 위반 - deviceId가 필수입니다. userId: ${userId}, deviceId: ${deviceId}`);
+          const constraintError: any = new Error('deviceId는 필수 필드입니다. 각 기기는 고유한 deviceId를 가져야 합니다.');
+          constraintError.code = 'MISSING_REQUIRED_FIELDS';
+          constraintError.status = 400;
+          throw constraintError;
         }
         
         // 알 수 없는 Unique constraint 에러
