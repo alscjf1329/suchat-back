@@ -25,6 +25,25 @@ export class PushController {
   constructor(private readonly pushService: PushService) {}
 
   /**
+   * 에러 코드를 커스텀 숫자 코드로 변환
+   */
+  private getCustomErrorCode(errorCode: string): string {
+    const errorCodeMap: Record<string, string> = {
+      'MISSING_REQUIRED_FIELDS': '02',
+      'PUSH_SUBSCRIPTION_FAILED': '03',
+      'SUBSCRIPTION_NOT_FOUND': '04',
+      'DATABASE_CONSTRAINT_VIOLATION': '05',
+      'DATABASE_CONNECTION_FAILED': '06',
+      'DATABASE_ERROR': '07',
+      'DEVICE_NOT_FOUND': '08',
+      'INTERNAL_SERVER_ERROR': '09',
+      'UNKNOWN_ERROR': '10',
+    };
+    
+    return errorCodeMap[errorCode] || '10';
+  }
+
+  /**
    * 푸시 알림 구독
    * POST /push/subscribe
    */
@@ -36,14 +55,16 @@ export class PushController {
       return await this.pushService.subscribe(userId, subscribeDto);
     } catch (error: any) {
       // 에러 코드와 메시지를 포함한 응답
-      const errorCode = error.code || 'PUSH_SUBSCRIPTION_FAILED';
+      const originalErrorCode = error.code || 'PUSH_SUBSCRIPTION_FAILED';
+      const customErrorCode = this.getCustomErrorCode(originalErrorCode);
       const statusCode = error.status || HttpStatus.INTERNAL_SERVER_ERROR;
       const errorMessage = error.message || '푸시 구독에 실패했습니다.';
       
       throw new HttpException(
         {
           success: false,
-          errorCode,
+          errorCode: customErrorCode,
+          originalErrorCode,
           message: errorMessage,
           details: error.details || null,
         },
