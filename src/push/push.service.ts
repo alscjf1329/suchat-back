@@ -50,7 +50,7 @@ export class PushService implements OnModuleInit {
       });
 
       if (subscription) {
-        // 기존 구독 업데이트 (같은 기기의 새 구독 정보로 업데이트)
+        // 기존 구독 업데이트 (등록된 deviceId의 구독 정보 업데이트)
         subscription.endpoint = endpoint;
         subscription.p256dh = p256dh;
         subscription.auth = auth;
@@ -58,7 +58,7 @@ export class PushService implements OnModuleInit {
         subscription.deviceName = deviceName;
         subscription.userAgent = userAgent;
         subscription.isActive = true;
-        this.logger.log(`🔄 Push subscription updated for user: ${userId}, device: ${deviceId} (${deviceType})`);
+        this.logger.log(`🔄 [UPDATE] Push subscription updated for user: ${userId}, device: ${deviceId} (${deviceType})`);
       } else {
         // deviceId가 없거나 기존 레코드가 없는 경우, userId만으로도 확인 (레거시 지원)
         if (!deviceId) {
@@ -79,7 +79,7 @@ export class PushService implements OnModuleInit {
             subscription.isActive = true;
             this.logger.log(`🔄 Push subscription updated (legacy) for user: ${userId}`);
           } else {
-            // 새 구독 생성
+            // 새 구독 생성 (등록되지 않은 deviceId)
             subscription = this.pushSubscriptionRepository.create({
               userId,
               deviceId: deviceId || `device-${Date.now()}`,
@@ -90,10 +90,10 @@ export class PushService implements OnModuleInit {
               auth,
               userAgent,
             });
-            this.logger.log(`✅ Push subscription created for user: ${userId}, device: ${deviceId || 'auto-generated'} (${deviceType})`);
+            this.logger.log(`✅ [CREATE] Push subscription created for user: ${userId}, device: ${deviceId || 'auto-generated'} (${deviceType})`);
           }
         } else {
-          // 새 구독 생성
+          // 새 구독 생성 (등록되지 않은 deviceId)
           subscription = this.pushSubscriptionRepository.create({
             userId,
             deviceId,
@@ -104,7 +104,7 @@ export class PushService implements OnModuleInit {
             auth,
             userAgent,
           });
-          this.logger.log(`✅ Push subscription created for user: ${userId}, device: ${deviceId} (${deviceType})`);
+          this.logger.log(`✅ [CREATE] Push subscription created for user: ${userId}, device: ${deviceId} (${deviceType})`);
         }
       }
 
