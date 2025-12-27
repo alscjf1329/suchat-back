@@ -11,6 +11,16 @@ export class ChatAlbumController {
 
   // ⚠️ 라우팅 순서 중요: 구체적인 경로가 먼저 와야 함
   
+  // 사진첩 전체 개수 조회
+  @Get(':roomId/count')
+  async getAlbumCount(
+    @Param('roomId') roomId: string,
+    @Query('folderId') folderId?: string,
+  ) {
+    const count = await this.albumService.getRoomAlbumCount(roomId, folderId);
+    return { count };
+  }
+  
   // 폴더 목록 조회
   @Get(':roomId/folders')
   async getFolders(@Param('roomId') roomId: string) {
@@ -53,16 +63,19 @@ export class ChatAlbumController {
     return { success: true };
   }
 
-  // 채팅방 사진첩 조회 (루트 또는 전체, 페이지네이션 지원)
+  // 채팅방 사진첩 조회 (루트 또는 전체, 페이지네이션 지원, 루트는 메시지 사진 포함)
   @Get(':roomId')
   async getRoomAlbum(
     @Param('roomId') roomId: string,
     @Query('limit') limit?: string,
     @Query('offset') offset?: string,
+    @Query('folderId') folderId?: string,
   ) {
     const limitNum = limit ? parseInt(limit, 10) : 50;
     const offsetNum = offset ? parseInt(offset, 10) : 0;
-    const result = await this.albumService.getRoomAlbum(roomId, limitNum, offsetNum);
+    // folderId가 없거나 빈 문자열이면 루트 폴더 (null)
+    const folderIdParam = folderId === undefined || folderId === '' ? null : folderId;
+    const result = await this.albumService.getRoomAlbum(roomId, limitNum, offsetNum, folderIdParam);
     return result;
   }
 

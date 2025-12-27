@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, ForbiddenException, Logger } from '@nest
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
 import { RoomAlbum, RoomAlbumFolder } from './entities';
+import { Message } from './entities/message.entity';
 
 @Injectable()
 export class ChatAlbumService {
@@ -12,22 +13,135 @@ export class ChatAlbumService {
     private readonly albumRepository: Repository<RoomAlbum>,
     @InjectRepository(RoomAlbumFolder)
     private readonly folderRepository: Repository<RoomAlbumFolder>,
+    @InjectRepository(Message)
+    private readonly messageRepository: Repository<Message>,
   ) {}
 
-  // 채팅방 사진첩 조회 (최신순, 페이지네이션 지원)
-  async getRoomAlbum(roomId: string, limit: number = 50, offset: number = 0): Promise<{ albums: RoomAlbum[]; total: number }> {
-    const queryBuilder = this.albumRepository
+  // 채팅방 사진첩 전체 개수 조회 (루트 폴더는 메시지 사진 포함)
+  async getRoomAlbumCount(roomId: string, folderId?: string | null): Promise<number> {
+    let albumCount = 0;
+    
+    // 사진첩에 직접 업로드한 사진 개수
+    const albumQueryBuilder = this.albumRepository
+      .createQueryBuilder('album')
+      .where('album.roomId = :roomId', { roomId });
+    
+    if (folderId !== undefined && folderId !== null) {
+      if (folderId === '') {
+        // 루트 폴더 (folderId가 null인 것)
+        albumQueryBuilder.andWhere('album.folderId IS NULL');
+      } else {
+        albumQueryBuilder.andWhere('album.folderId = :folderId', { folderId });
+        albumCount = await albumQueryBuilder.getCount();
+        return albumCount;
+      }
+    } else {
+      // folderId가 undefined면 루트 폴더 조회 시 메시지 사진도 포함
+      albumQueryBuilder.andWhere('album.folderId IS NULL');
+      
+      // 채팅 메시지의 이미지/비디오 개수 추가
+      const messages = await this.messageRepository.find({
+        where: {
+          roomId,
+          type: In(['image', 'video', 'images']),
+        },
+      });
+      
+      // 메시지의 파일 개수 계산 (images 타입은 여러 파일 포함)
+      let messageFileCount = 0;
+      for (const message of messages) {
+        if (message.type === 'images' && message.files) {
+          messageFileCount += message.files.length;
+        } else if (message.fileUrl) {
+          messageFileCount += 1;
+        }
+      }
+      
+      albumCount += messageFileCount;
+    }
+    
+    albumCount += await albumQueryBuilder.getCount();
+    
+    return albumCount;
+  }
+
+  // 채팅방 사진첩 조회 (최신순, 페이지네이션 지원, 루트 폴더는 메시지 사진 포함)
+  async getRoomAlbum(roomId: string, limit: number = 50, offset: number = 0, folderId?: string | null): Promise<{ albums: RoomAlbum[]; total: number }> {
+    // folderId가 없거나 null이면 루트 폴더 조회 (메시지 사진 포함)
+    const includeMessages = folderId === undefined || folderId === null;
+    
+    // 사진첩에 직접 업로드한 사진 조회
+    const albumQueryBuilder = this.albumRepository
       .createQueryBuilder('album')
       .where('album.roomId = :roomId', { roomId })
-      .orderBy('album.uploadedAt', 'DESC')
-      .take(limit)
-      .skip(offset);
+      .andWhere('album.folderId IS NULL');
     
-    const [albums, total] = await queryBuilder.getManyAndCount();
+    // 채팅 메시지의 이미지/비디오 조회
+    let messageAlbums: any[] = [];
+    if (includeMessages) {
+      const messages = await this.messageRepository.find({
+        where: {
+          roomId,
+          type: In(['image', 'video', 'images']),
+        },
+        order: { timestamp: 'DESC' },
+      });
+      
+      // 메시지를 RoomAlbum 형식으로 변환
+      messageAlbums = messages.flatMap((message) => {
+        if (message.type === 'images' && message.files) {
+          // 여러 파일이 있는 경우
+          return message.files.map((file) => ({
+            id: `${message.id}-${file.fileUrl}`, // 고유 ID 생성
+            roomId: message.roomId,
+            folderId: null,
+            uploadedBy: message.userId,
+            type: file.fileUrl.match(/\.(mp4|webm|mov|m4v)$/i) ? 'video' : 'image',
+            fileUrl: file.fileUrl,
+            thumbnailUrl: file.thumbnailUrl,
+            fileName: file.fileName,
+            fileSize: file.fileSize,
+            uploadedAt: message.timestamp,
+            fromMessage: true, // 메시지에서 온 것임을 표시
+          }));
+        } else if (message.fileUrl) {
+          // 단일 파일
+          return [{
+            id: `${message.id}-${message.fileUrl}`,
+            roomId: message.roomId,
+            folderId: null,
+            uploadedBy: message.userId,
+            type: message.type === 'video' ? 'video' : 'image',
+            fileUrl: message.fileUrl,
+            thumbnailUrl: undefined,
+            fileName: message.fileName || message.fileUrl.split('/').pop() || 'file',
+            fileSize: message.fileSize || 0,
+            uploadedAt: message.timestamp,
+            fromMessage: true,
+          }];
+        }
+        return [];
+      });
+    }
     
-    this.logger.log(`[getRoomAlbum] ${albums.length}개 조회됨 (전체: ${total}개)`);
+    // 사진첩 사진과 메시지 사진을 합치고 정렬
+    const [albums, albumTotal] = await albumQueryBuilder.getManyAndCount();
+    const allAlbums = [...messageAlbums, ...albums];
     
-    return { albums, total };
+    // uploadedAt 기준으로 정렬
+    allAlbums.sort((a, b) => {
+      const dateA = a.uploadedAt instanceof Date ? a.uploadedAt : new Date(a.uploadedAt);
+      const dateB = b.uploadedAt instanceof Date ? b.uploadedAt : new Date(b.uploadedAt);
+      return dateB.getTime() - dateA.getTime();
+    });
+    
+    // 페이지네이션 적용
+    const total = allAlbums.length;
+    const paginatedAlbums = allAlbums.slice(offset, offset + limit);
+    
+    this.logger.log(`[getRoomAlbum] ${paginatedAlbums.length}개 조회됨 (전체: ${total}개, 메시지: ${messageAlbums.length}개, 사진첩: ${albums.length}개)`);
+    
+    return { albums: paginatedAlbums, total };
   }
 
   // 사진첩에 파일 추가
