@@ -90,6 +90,18 @@ export class ChatAlbumController {
     return album;
   }
 
+  // 사진첩에서 여러 파일 일괄 삭제 (⚠️ 라우팅 순서: batch가 :albumId보다 먼저 와야 함)
+  @Delete('batch')
+  async deleteMultipleFromAlbum(
+    @Body() data: { albumIds: string[] },
+    @Request() req,
+  ) {
+    this.logger.log(`[deleteMultipleFromAlbum] 일괄 삭제: ${data.albumIds.length}개`);
+    const result = await this.albumService.deleteMultipleFromAlbum(data.albumIds, req.user.userId);
+    this.logger.log(`[deleteMultipleFromAlbum] 삭제 완료: ${result.deleted}개 성공, ${result.failed}개 실패`);
+    return result;
+  }
+
   // 사진첩에서 파일 삭제
   @Delete(':albumId')
   async deleteFromAlbum(

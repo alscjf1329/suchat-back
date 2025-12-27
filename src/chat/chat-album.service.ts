@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, ForbiddenException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, In } from 'typeorm';
 import { RoomAlbum, RoomAlbumFolder } from './entities';
 
 @Injectable()
@@ -63,6 +63,31 @@ export class ChatAlbumService {
     }
 
     await this.albumRepository.delete(albumId);
+  }
+
+  // 사진첩에서 여러 파일 일괄 삭제 (본인만 가능)
+  async deleteMultipleFromAlbum(albumIds: string[], userId: string): Promise<{ deleted: number; failed: number }> {
+    if (!albumIds || albumIds.length === 0) {
+      return { deleted: 0, failed: 0 };
+    }
+
+    // 본인이 업로드한 파일만 조회
+    const albums = await this.albumRepository.find({
+      where: {
+        id: In(albumIds),
+        uploadedBy: userId,
+      },
+    });
+
+    const validAlbumIds = albums.map(album => album.id);
+    const deletedCount = validAlbumIds.length;
+    const failedCount = albumIds.length - deletedCount;
+
+    if (validAlbumIds.length > 0) {
+      await this.albumRepository.delete(validAlbumIds);
+    }
+
+    return { deleted: deletedCount, failed: failedCount };
   }
 
   // 폴더 목록 조회 (트리 구조)
