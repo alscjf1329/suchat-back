@@ -14,15 +14,20 @@ export class ChatAlbumService {
     private readonly folderRepository: Repository<RoomAlbumFolder>,
   ) {}
 
-  // 채팅방 사진첩 조회 (최신순)
-  async getRoomAlbum(roomId: string): Promise<RoomAlbum[]> {
-    this.logger.debug(`[getRoomAlbum] 조회 시작: roomId=${roomId}`);
-    const albums = await this.albumRepository.find({
-      where: { roomId },
-      order: { uploadedAt: 'DESC' },
-    });
-    this.logger.log(`[getRoomAlbum] ${albums.length}개 조회됨`);
-    return albums;
+  // 채팅방 사진첩 조회 (최신순, 페이지네이션 지원)
+  async getRoomAlbum(roomId: string, limit: number = 50, offset: number = 0): Promise<{ albums: RoomAlbum[]; total: number }> {
+    const queryBuilder = this.albumRepository
+      .createQueryBuilder('album')
+      .where('album.roomId = :roomId', { roomId })
+      .orderBy('album.uploadedAt', 'DESC')
+      .take(limit)
+      .skip(offset);
+    
+    const [albums, total] = await queryBuilder.getManyAndCount();
+    
+    this.logger.log(`[getRoomAlbum] ${albums.length}개 조회됨 (전체: ${total}개)`);
+    
+    return { albums, total };
   }
 
   // 사진첩에 파일 추가
@@ -92,13 +97,11 @@ export class ChatAlbumService {
 
   // 폴더 목록 조회 (트리 구조)
   async getFolders(roomId: string): Promise<RoomAlbumFolder[]> {
-    this.logger.debug(`[getFolders] 폴더 조회: roomId=${roomId}`);
     const folders = await this.folderRepository.find({
       where: { roomId },
       order: { createdAt: 'ASC' },
       relations: ['children'],
     });
-    this.logger.log(`[getFolders] ${folders.length}개 폴더 조회됨`);
     return folders;
   }
 
@@ -120,12 +123,19 @@ export class ChatAlbumService {
     return await this.folderRepository.save(folder);
   }
 
-  // 폴더별 사진 조회
-  async getAlbumsByFolder(roomId: string, folderId: string): Promise<RoomAlbum[]> {
-    return await this.albumRepository.find({
-      where: { roomId, folderId },
-      order: { uploadedAt: 'DESC' },
-    });
+  // 폴더별 사진 조회 (페이지네이션 지원)
+  async getAlbumsByFolder(roomId: string, folderId: string, limit: number = 50, offset: number = 0): Promise<{ albums: RoomAlbum[]; total: number }> {
+    const queryBuilder = this.albumRepository
+      .createQueryBuilder('album')
+      .where('album.roomId = :roomId', { roomId })
+      .andWhere('album.folderId = :folderId', { folderId })
+      .orderBy('album.uploadedAt', 'DESC')
+      .take(limit)
+      .skip(offset);
+    
+    const [albums, total] = await queryBuilder.getManyAndCount();
+    
+    return { albums, total };
   }
 
   // 폴더 삭제 (본인만 가능, 하위 폴더도 함께 삭제)

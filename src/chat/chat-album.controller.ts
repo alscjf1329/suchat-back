@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Delete, Param, Body, UseGuards, Request, Logger } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Param, Body, Query, UseGuards, Request, Logger } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ChatAlbumService } from './chat-album.service';
 
@@ -14,9 +14,7 @@ export class ChatAlbumController {
   // 폴더 목록 조회
   @Get(':roomId/folders')
   async getFolders(@Param('roomId') roomId: string) {
-    this.logger.log(`[getFolders] 폴더 목록 조회: roomId=${roomId}`);
     const folders = await this.albumService.getFolders(roomId);
-    this.logger.debug(`[getFolders] ${folders.length}개 폴더 조회됨`);
     return folders;
   }
 
@@ -27,23 +25,22 @@ export class ChatAlbumController {
     @Body() data: { name: string; description?: string; parentId?: string },
     @Request() req,
   ) {
-    this.logger.log(`[createFolder] 폴더 생성: roomId=${roomId}, name=${data.name}, parentId=${data.parentId || 'root'}, userId=${req.user.userId}`);
-    this.logger.debug(`[createFolder] 요청 데이터:`, data);
     const folder = await this.albumService.createFolder(roomId, req.user.userId, data.name, data.description, data.parentId);
-    this.logger.log(`[createFolder] 폴더 생성 완료: folderId=${folder.id}`);
     return folder;
   }
 
-  // 폴더별 사진 조회
+  // 폴더별 사진 조회 (페이지네이션 지원)
   @Get(':roomId/folders/:folderId')
   async getAlbumsByFolder(
     @Param('roomId') roomId: string,
     @Param('folderId') folderId: string,
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
   ) {
-    this.logger.log(`[getAlbumsByFolder] 폴더별 사진 조회: folderId=${folderId}`);
-    const albums = await this.albumService.getAlbumsByFolder(roomId, folderId);
-    this.logger.debug(`[getAlbumsByFolder] ${albums.length}개 사진 조회됨`);
-    return albums;
+    const limitNum = limit ? parseInt(limit, 10) : 50;
+    const offsetNum = offset ? parseInt(offset, 10) : 0;
+    const result = await this.albumService.getAlbumsByFolder(roomId, folderId, limitNum, offsetNum);
+    return result;
   }
 
   // 폴더 삭제
@@ -52,18 +49,21 @@ export class ChatAlbumController {
     @Param('folderId') folderId: string,
     @Request() req,
   ) {
-    this.logger.log(`[deleteFolder] 폴더 삭제: folderId=${folderId}`);
     await this.albumService.deleteFolder(folderId, req.user.userId);
     return { success: true };
   }
 
-  // 채팅방 사진첩 조회 (루트 또는 전체)
+  // 채팅방 사진첩 조회 (루트 또는 전체, 페이지네이션 지원)
   @Get(':roomId')
-  async getRoomAlbum(@Param('roomId') roomId: string) {
-    this.logger.log(`[getRoomAlbum] 사진첩 조회: roomId=${roomId}`);
-    const albums = await this.albumService.getRoomAlbum(roomId);
-    this.logger.debug(`[getRoomAlbum] ${albums.length}개 사진 조회됨`);
-    return albums;
+  async getRoomAlbum(
+    @Param('roomId') roomId: string,
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+  ) {
+    const limitNum = limit ? parseInt(limit, 10) : 50;
+    const offsetNum = offset ? parseInt(offset, 10) : 0;
+    const result = await this.albumService.getRoomAlbum(roomId, limitNum, offsetNum);
+    return result;
   }
 
   // 사진첩에 파일 추가
@@ -80,13 +80,11 @@ export class ChatAlbumController {
     },
     @Request() req,
   ) {
-    this.logger.log(`[addToAlbum] 사진첩에 추가: roomId=${roomId}, type=${data.type}, fileName=${data.fileName}, folderId=${data.folderId || 'root'}`);
     const album = await this.albumService.addToAlbum(
       roomId,
       req.user.userId,
       data,
     );
-    this.logger.debug(`[addToAlbum] 추가 완료: albumId=${album.id}`);
     return album;
   }
 
@@ -96,9 +94,7 @@ export class ChatAlbumController {
     @Body() data: { albumIds: string[] },
     @Request() req,
   ) {
-    this.logger.log(`[deleteMultipleFromAlbum] 일괄 삭제: ${data.albumIds.length}개`);
     const result = await this.albumService.deleteMultipleFromAlbum(data.albumIds, req.user.userId);
-    this.logger.log(`[deleteMultipleFromAlbum] 삭제 완료: ${result.deleted}개 성공, ${result.failed}개 실패`);
     return result;
   }
 
@@ -108,7 +104,6 @@ export class ChatAlbumController {
     @Param('albumId') albumId: string,
     @Request() req,
   ) {
-    this.logger.log(`[deleteFromAlbum] 사진 삭제: albumId=${albumId}`);
     await this.albumService.deleteFromAlbum(albumId, req.user.userId);
     return { success: true };
   }
