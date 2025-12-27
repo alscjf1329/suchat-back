@@ -30,7 +30,30 @@ export class ChatAlbumService {
       if (folderId === '') {
         // 루트 폴더 (folderId가 null인 것)
         albumQueryBuilder.andWhere('album.folderId IS NULL');
+        albumCount = await albumQueryBuilder.getCount();
+        
+        // 채팅 메시지의 이미지/비디오 개수 추가
+        const messages = await this.messageRepository.find({
+          where: {
+            roomId,
+            type: In(['image', 'video', 'images']),
+          },
+        });
+        
+        // 메시지의 파일 개수 계산 (images 타입은 여러 파일 포함)
+        let messageFileCount = 0;
+        for (const message of messages) {
+          if (message.type === 'images' && message.files) {
+            messageFileCount += message.files.length;
+          } else if (message.fileUrl) {
+            messageFileCount += 1;
+          }
+        }
+        
+        albumCount += messageFileCount;
+        return albumCount;
       } else {
+        // 특정 폴더
         albumQueryBuilder.andWhere('album.folderId = :folderId', { folderId });
         albumCount = await albumQueryBuilder.getCount();
         return albumCount;
@@ -38,6 +61,7 @@ export class ChatAlbumService {
     } else {
       // folderId가 undefined면 루트 폴더 조회 시 메시지 사진도 포함
       albumQueryBuilder.andWhere('album.folderId IS NULL');
+      albumCount = await albumQueryBuilder.getCount();
       
       // 채팅 메시지의 이미지/비디오 개수 추가
       const messages = await this.messageRepository.find({
@@ -58,11 +82,8 @@ export class ChatAlbumService {
       }
       
       albumCount += messageFileCount;
+      return albumCount;
     }
-    
-    albumCount += await albumQueryBuilder.getCount();
-    
-    return albumCount;
   }
 
   // 채팅방 사진첩 조회 (최신순, 페이지네이션 지원, 루트 폴더는 메시지 사진 포함)
