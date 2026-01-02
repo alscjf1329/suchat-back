@@ -4,6 +4,7 @@
 
 ## 📋 목차
 
+0. [자동 설치 스크립트 (권장)](#0-자동-설치-스크립트-권장)
 1. [사전 요구사항](#1-사전-요구사항)
 2. [프로젝트 클론 및 의존성 설치](#2-프로젝트-클론-및-의존성-설치)
 3. [환경 변수 설정](#3-환경-변수-설정)
@@ -13,6 +14,69 @@
 7. [개발 서버 실행](#7-개발-서버-실행)
 8. [PM2를 사용한 프로덕션 실행](#8-pm2를-사용한-프로덕션-실행)
 9. [설치 확인](#9-설치-확인)
+
+---
+
+## 0️⃣ 자동 설치 스크립트 (권장) ⚡
+
+가장 빠르고 간편한 설치 방법입니다. 스크립트가 모든 설정을 자동으로 처리합니다.
+
+### 개발 환경 설치
+
+```bash
+# 백엔드 디렉토리에서 실행
+cd suchat-back
+./bin/install.sh dev
+```
+
+**자동으로 수행되는 작업:**
+- ✅ 사전 요구사항 확인 (Node.js, pnpm, Docker)
+- ✅ 백엔드 의존성 설치
+- ✅ JWT_SECRET 자동 생성
+- ✅ VAPID 키 자동 생성
+- ✅ `.env` 파일 자동 생성
+- ✅ 프론트엔드 `.env.local` 파일 자동 생성
+- ✅ Docker 컨테이너 실행 (PostgreSQL, Redis, pgAdmin, Redis Commander)
+- ✅ 데이터베이스 초기화 (테이블 생성, 테스트 사용자 생성)
+- ✅ 프론트엔드 의존성 설치
+
+### 운영 환경 설치
+
+```bash
+# 백엔드 디렉토리에서 실행
+cd suchat-back
+./bin/install.sh op
+```
+
+**자동으로 수행되는 작업:**
+- ✅ 사전 요구사항 확인
+- ✅ 백엔드 의존성 설치
+- ✅ 환경 변수 설정 (사용자 입력 받기)
+- ✅ 프로덕션 빌드
+
+### 설치 후
+
+**개발 환경:**
+```bash
+# 터미널 1: 백엔드
+cd suchat-back
+pnpm run start:dev
+
+# 터미널 2: 프론트엔드
+cd suchat-front
+pnpm run dev
+```
+
+**운영 환경:**
+```bash
+# PM2로 실행
+pm2 start dist/main.js --name suchat-backend
+pm2 save
+```
+
+> 💡 **팁**: 자동 설치 스크립트를 사용하면 수동 설정이 필요 없습니다. 문제가 발생하면 아래의 수동 설치 가이드를 참조하세요.
+
+---
 
 ---
 
@@ -71,25 +135,31 @@ pnpm install
 
 ## 3️⃣ 환경 변수 설정
 
+> ⚠️ **참고**: 자동 설치 스크립트(`./bin/install.sh dev`)를 사용하면 이 단계가 자동으로 수행됩니다.
+
 ### 3.1 환경 변수 파일 생성
 
 ```bash
-# 환경 변수 예시 파일 복사
+# 환경 변수 예시 파일 복사 (있는 경우)
 cp .env.example .env
+
+# 또는 수동으로 생성
+touch .env
 ```
 
-### 3.2 환경 변수 편집
+### 3.2 필수 환경 변수
 
-`.env` 파일을 열어서 다음 항목들을 실제 값으로 변경하세요:
+`.env` 파일에 다음 항목들이 반드시 설정되어 있어야 합니다:
 
 **필수 설정 항목:**
 
 1. **JWT_SECRET**: JWT 토큰 서명용 비밀키 (최소 32자)
-2. **DB_PASSWORD**: PostgreSQL 비밀번호 (기본값: postgres123)
-3. **VAPID 키들**: 푸시 알림 사용 시 (아래 섹션 참조)
-4. **SMTP 설정**: 이메일 기능 사용 시
+2. **VAPID_PUBLIC_KEY**: 푸시 알림 공개키
+3. **VAPID_PRIVATE_KEY**: 푸시 알림 개인키
+4. **DB_PASSWORD**: PostgreSQL 비밀번호 (기본값: postgres123)
+5. **SMTP 설정**: 이메일 기능 사용 시 (운영 환경 필수)
 
-> 📝 **참고**: `.env.example` 파일에 모든 환경 변수의 예시가 포함되어 있습니다.
+> 📝 **참고**: `.env.example` 파일이 있다면 참고하세요. 자동 설치 스크립트는 모든 필수 값을 자동으로 생성합니다.
 
 ### 3.3 JWT_SECRET 생성
 
@@ -102,6 +172,72 @@ pnpm exec node -e "console.log(require('crypto').randomBytes(32).toString('hex')
 ```
 
 생성된 값을 `.env` 파일의 `JWT_SECRET`에 설정하세요.
+
+### 3.4 환경 변수 파일 예시
+
+**개발 환경 (.env):**
+```env
+NODE_ENV=development
+PORT=8000
+
+# 필수 환경 변수
+JWT_SECRET=생성된_64자_랜덤_문자열
+VAPID_PUBLIC_KEY=생성된_공개키
+VAPID_PRIVATE_KEY=생성된_개인키
+VAPID_SUBJECT=mailto:admin@suchat.com
+
+# 데이터베이스 설정
+DB_HOST=localhost
+DB_PORT=5432
+DB_USERNAME=postgres
+DB_PASSWORD=postgres123
+DB_DATABASE=suchat
+
+# Redis 설정
+REDIS_HOST=localhost
+REDIS_PORT=6379
+REDIS_PASSWORD=
+
+# 파일 업로드 설정
+UPLOAD_PATH=./uploads
+MAX_FILE_SIZE=104857600
+```
+
+**운영 환경 (.env):**
+```env
+NODE_ENV=production
+PORT=8000
+
+# 필수 환경 변수 (더 강력한 비밀키 사용 권장)
+JWT_SECRET=프로덕션용_강력한_비밀키
+VAPID_PUBLIC_KEY=생성된_공개키
+VAPID_PRIVATE_KEY=생성된_개인키
+VAPID_SUBJECT=mailto:admin@yourdomain.com
+
+# 데이터베이스 설정 (실제 프로덕션 값)
+DB_HOST=your_production_db_host
+DB_PORT=5432
+DB_USERNAME=your_db_user
+DB_PASSWORD=your_secure_password
+DB_DATABASE=suchat
+
+# Redis 설정 (실제 프로덕션 값)
+REDIS_HOST=your_production_redis_host
+REDIS_PORT=6379
+REDIS_PASSWORD=your_redis_password
+
+# 파일 업로드 설정
+UPLOAD_PATH=./uploads
+MAX_FILE_SIZE=104857600
+
+# 이메일 설정 (운영 환경 필수)
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=your_email@gmail.com
+SMTP_PASS=your_app_password
+EMAIL_FROM=noreply@yourdomain.com
+FRONTEND_URL=https://yourdomain.com
+```
 
 ### 3.4 Gmail SMTP 설정 (선택)
 
@@ -116,40 +252,57 @@ pnpm exec node -e "console.log(require('crypto').randomBytes(32).toString('hex')
 
 ## 4️⃣ VAPID 키 생성 (푸시 알림용)
 
+> ⚠️ **참고**: 자동 설치 스크립트(`./bin/install.sh dev`)를 사용하면 이 단계가 자동으로 수행됩니다.
+
 푸시 알림 기능을 사용하려면 VAPID 키가 필요합니다:
 
 ```bash
 # 백엔드 디렉토리에서 실행
 pnpm exec web-push generate-vapid-keys
+
+# 또는 npx 사용
+npx web-push generate-vapid-keys
 ```
 
 출력 예시:
 ```
-Public Key: BKxxx...xxx
-Private Key: xxx...xxx
+=======================================
+
+Public Key:
+BOped-ONP1podGZyDYfO3ImM4pZwG8dbw6bHBt0EWkkegjbPLWLbuyNsfVYPeP266iej_LJbZdsGT0cZJ4MJv4g
+
+Private Key:
+lxK0MjNYdvQzM7ogzLW8_z9UWDJD-JYyC9Orgy0zY90
+
+=======================================
 ```
 
 생성된 키를 `.env` 파일에 추가하세요:
 
 ```env
-VAPID_PUBLIC_KEY=BKxxx...xxx
-VAPID_PRIVATE_KEY=xxx...xxx
+VAPID_PUBLIC_KEY=BOped-ONP1podGZyDYfO3ImM4pZwG8dbw6bHBt0EWkkegjbPLWLbuyNsfVYPeP266iej_LJbZdsGT0cZJ4MJv4g
+VAPID_PRIVATE_KEY=lxK0MjNYdvQzM7ogzLW8_z9UWDJD-JYyC9Orgy0zY90
 VAPID_SUBJECT=mailto:admin@suchat.com
 ```
 
-> ⚠️ **중요**: `VAPID_PUBLIC_KEY`는 프론트엔드 `.env.local`에도 동일하게 설정해야 합니다.
+> ⚠️ **중요**: 
+> - `VAPID_PUBLIC_KEY`는 프론트엔드 `.env.local`에도 동일하게 설정해야 합니다.
+> - 자동 설치 스크립트는 프론트엔드 설정도 자동으로 처리합니다.
 
 ---
 
 ## 5️⃣ Docker 컨테이너 실행 (PostgreSQL & Redis)
 
+> ⚠️ **참고**: 자동 설치 스크립트(`./bin/install.sh dev`)를 사용하면 이 단계가 자동으로 수행됩니다.
+
 ### 5.1 Docker 컨테이너 시작
 
 ```bash
-# Docker 디렉토리로 이동
-cd bin/docker
+# 방법 1: 자동 설치 스크립트 사용 (권장)
+./bin/install.sh dev
 
-# Windows (Git Bash)
+# 방법 2: 수동 실행
+cd bin/docker
 ./start-db.sh
 
 # 또는 직접 Docker Compose 실행
@@ -201,6 +354,8 @@ docker compose down -v
 ---
 
 ## 6️⃣ 데이터베이스 초기화
+
+> ⚠️ **참고**: 자동 설치 스크립트(`./bin/install.sh dev`)를 사용하면 이 단계가 자동으로 수행됩니다.
 
 > 📌 **중요**: 데이터베이스 초기화는 Docker 컨테이너가 실행된 후에만 가능합니다.
 
@@ -568,6 +723,37 @@ node dist/main.js
 - **[API_DOCS.md](API_DOCS.md)** - API 문서
 - **[DATABASE_SCHEMA.md](DATABASE_SCHEMA.md)** - 데이터베이스 스키마
 - **[PWA_PUSH_GUIDE.md](PWA_PUSH_GUIDE.md)** - 푸시 알림 가이드
+
+---
+
+## 🔄 빠른 설치 요약
+
+### 개발 환경 (한 번에 설치)
+
+```bash
+cd suchat-back
+./bin/install.sh dev
+```
+
+이 명령어 하나로 모든 설정이 완료됩니다:
+- ✅ 환경 변수 자동 생성 (JWT_SECRET, VAPID 키)
+- ✅ Docker 컨테이너 실행
+- ✅ 데이터베이스 초기화
+- ✅ 프론트엔드 환경 변수 설정
+
+### 운영 환경 설치
+
+```bash
+cd suchat-back
+./bin/install.sh op
+```
+
+설치 후:
+```bash
+# 빌드 및 실행
+pnpm run build
+pm2 start dist/main.js --name suchat-backend
+```
 
 ---
 
