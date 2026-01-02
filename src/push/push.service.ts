@@ -258,13 +258,29 @@ export class PushService implements OnModuleInit {
     const { userId, title, body, icon, badge, data, tag } = jobData;
 
     // 사용자의 활성 구독만 조회 (푸시 발송용)
-    const subscriptions = await this.pushSubscriptionRepository.find({
+    const allSubscriptions = await this.pushSubscriptionRepository.find({
       where: { userId, isActive: true },
+      order: { updatedAt: 'DESC' }, // 최신순 정렬
     });
 
-    if (subscriptions.length === 0) {
+    if (allSubscriptions.length === 0) {
       this.logger.warn(`⚠️  No active subscriptions for user: ${userId}`);
       return { success: false, reason: 'No subscriptions' };
+    }
+
+    // endpoint 중복 제거 (같은 endpoint가 여러 개 있으면 가장 최신 것만 선택)
+    const uniqueSubscriptions = new Map<string, typeof allSubscriptions[0]>();
+    for (const subscription of allSubscriptions) {
+      if (!uniqueSubscriptions.has(subscription.endpoint)) {
+        uniqueSubscriptions.set(subscription.endpoint, subscription);
+      }
+    }
+    const subscriptions = Array.from(uniqueSubscriptions.values());
+
+    if (subscriptions.length < allSubscriptions.length) {
+      this.logger.warn(
+        `⚠️  Duplicate endpoint detected and removed: ${allSubscriptions.length} subscriptions → ${subscriptions.length} unique endpoints`,
+      );
     }
 
     // 푸시 알림 페이로드
