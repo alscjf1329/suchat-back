@@ -64,15 +64,15 @@ export class PushService implements OnModuleInit {
     }
 
     try {
-      // 기존 구독 확인 (userId + deviceId 조합으로만 조회)
+      // 먼저 같은 endpoint로 기존 구독 확인 (덮어쓰기 우선)
       let subscription = await this.pushSubscriptionRepository.findOne({
-        where: { userId, deviceId },
+        where: { endpoint },
       });
 
-      this.logger.log(`🔍 [subscribe] 기존 구독 조회 결과: ${subscription ? '존재함' : '없음'} - userId: ${userId}, deviceId: ${deviceId}`);
-
       if (subscription) {
-        // 기존 구독 업데이트 (동일한 deviceId의 구독 정보만 업데이트)
+        // 같은 endpoint가 있으면 모든 정보 덮어쓰기
+        subscription.userId = userId;
+        subscription.deviceId = deviceId;
         subscription.endpoint = endpoint;
         subscription.p256dh = p256dh;
         subscription.auth = auth;
@@ -80,20 +80,39 @@ export class PushService implements OnModuleInit {
         subscription.deviceName = deviceName;
         subscription.userAgent = userAgent;
         subscription.isActive = true;
-        this.logger.log(`🔄 [UPDATE] Push subscription updated for user: ${userId}, device: ${deviceId} (${deviceType})`);
+        this.logger.log(`🔄 [UPDATE by endpoint] Push subscription updated for endpoint: ${endpoint.substring(0, 50)}..., userId: ${userId}, device: ${deviceId} (${deviceType})`);
       } else {
-        // 새 구독 생성 (등록되지 않은 deviceId)
-        subscription = this.pushSubscriptionRepository.create({
-          userId,
-          deviceId,
-          deviceType,
-          deviceName,
-          endpoint,
-          p256dh,
-          auth,
-          userAgent,
+        // endpoint로 찾지 못했으면 userId + deviceId 조합으로 조회
+        subscription = await this.pushSubscriptionRepository.findOne({
+          where: { userId, deviceId },
         });
-        this.logger.log(`✅ [CREATE] Push subscription created for user: ${userId}, device: ${deviceId} (${deviceType})`);
+
+        this.logger.log(`🔍 [subscribe] 기존 구독 조회 결과: ${subscription ? '존재함' : '없음'} - userId: ${userId}, deviceId: ${deviceId}`);
+
+        if (subscription) {
+          // 기존 구독 업데이트 (동일한 deviceId의 구독 정보만 업데이트)
+          subscription.endpoint = endpoint;
+          subscription.p256dh = p256dh;
+          subscription.auth = auth;
+          subscription.deviceType = deviceType;
+          subscription.deviceName = deviceName;
+          subscription.userAgent = userAgent;
+          subscription.isActive = true;
+          this.logger.log(`🔄 [UPDATE] Push subscription updated for user: ${userId}, device: ${deviceId} (${deviceType})`);
+        } else {
+          // 새 구독 생성 (등록되지 않은 deviceId)
+          subscription = this.pushSubscriptionRepository.create({
+            userId,
+            deviceId,
+            deviceType,
+            deviceName,
+            endpoint,
+            p256dh,
+            auth,
+            userAgent,
+          });
+          this.logger.log(`✅ [CREATE] Push subscription created for user: ${userId}, device: ${deviceId} (${deviceType})`);
+        }
       }
 
       await this.pushSubscriptionRepository.save(subscription);
@@ -121,12 +140,21 @@ export class PushService implements OnModuleInit {
         if (error.constraint === 'push_subscriptions_userId_deviceId_unique') {
           this.logger.warn(`⚠️  Duplicate (userId, deviceId) detected, attempting to update: ${userId}, ${deviceId}`);
           
-          // 기존 레코드를 찾아서 업데이트
-          const existing = await this.pushSubscriptionRepository.findOne({
-            where: { userId, deviceId },
+          // 먼저 endpoint로 찾기 (덮어쓰기 우선)
+          let existing = await this.pushSubscriptionRepository.findOne({
+            where: { endpoint },
           });
 
+          // endpoint로 찾지 못했으면 userId + deviceId로 찾기
+          if (!existing) {
+            existing = await this.pushSubscriptionRepository.findOne({
+              where: { userId, deviceId },
+            });
+          }
+
           if (existing) {
+            existing.userId = userId;
+            existing.deviceId = deviceId;
             existing.endpoint = endpoint;
             existing.p256dh = p256dh;
             existing.auth = auth;
