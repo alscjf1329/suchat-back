@@ -244,9 +244,11 @@ export class PostgresChatRepository implements IChatRepository {
   async getRoomParticipants(roomId: string): Promise<ChatRoomParticipant[]> {
     this.logger.debug(`[getRoomParticipants] 참여자 조회: roomId=${roomId}`);
     
-    const participants = await this.participantRepository.find({
-      where: { roomId }
-    });
+    const participants = await this.participantRepository
+      .createQueryBuilder('participant')
+      .leftJoinAndSelect('participant.user', 'user')
+      .where('participant.roomId = :roomId', { roomId })
+      .getMany();
 
     this.logger.log(`[getRoomParticipants] 참여자 ${participants.length}명 조회됨`);
     return participants;

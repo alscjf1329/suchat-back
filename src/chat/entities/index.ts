@@ -3,3 +3,5 @@ export { Message } from './message.entity';
 export { ChatRoomParticipant } from './chat-room-participant.entity';
 export { RoomAlbum } from './room-album.entity';
 export { RoomAlbumFolder } from './room-album-folder.entity';
+export { Schedule } from './schedule.entity';
+export { ScheduleParticipant } from './schedule-participant.entity';

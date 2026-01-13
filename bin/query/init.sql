@@ -1,7 +1,7 @@
 -- ========================================
 -- SuChat 데이터베이스 초기화 스크립트
--- Version: 1.1.0
--- Date: 2025-10-07
+-- Version: 1.2.0
+-- Date: 2025-01-XX
 -- ========================================
 -- 
 -- 사용법:
@@ -120,6 +120,35 @@ CREATE TABLE IF NOT EXISTS push_subscriptions (
   FOREIGN KEY ("userId") REFERENCES users(id) ON DELETE CASCADE
 );
 
+-- 1.9 일정 테이블
+CREATE TABLE IF NOT EXISTS schedules (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  "roomId" UUID NOT NULL,
+  "createdBy" UUID NOT NULL,
+  title VARCHAR(255) NOT NULL,
+  memo TEXT,
+  "startDate" TIMESTAMP NOT NULL,
+  "endDate" TIMESTAMP,
+  "notificationDateTime" TIMESTAMP,
+  "notificationInterval" VARCHAR(10),
+  "notificationRepeatCount" VARCHAR(10),
+  "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY ("roomId") REFERENCES chat_rooms(id) ON DELETE CASCADE,
+  FOREIGN KEY ("createdBy") REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- 1.10 일정 참여자 테이블
+CREATE TABLE IF NOT EXISTS schedule_participants (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  "scheduleId" UUID NOT NULL,
+  "userId" UUID NOT NULL,
+  "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY ("scheduleId") REFERENCES schedules(id) ON DELETE CASCADE,
+  FOREIGN KEY ("userId") REFERENCES users(id) ON DELETE CASCADE,
+  UNIQUE ("scheduleId", "userId")
+);
+
 -- ========================================
 -- 2. 인덱스 생성 (성능 최적화)
 -- ========================================
@@ -161,6 +190,16 @@ CREATE INDEX IF NOT EXISTS idx_refresh_tokens_expires ON refresh_tokens("expires
 CREATE INDEX IF NOT EXISTS idx_push_subscriptions_user ON push_subscriptions("userId");
 CREATE INDEX IF NOT EXISTS idx_push_subscriptions_active ON push_subscriptions("isActive") WHERE "isActive" = true;
 
+-- 2.9 schedules 인덱스 (일정 조회 최적화)
+CREATE INDEX IF NOT EXISTS idx_schedules_room ON schedules("roomId");
+CREATE INDEX IF NOT EXISTS idx_schedules_created_by ON schedules("createdBy");
+CREATE INDEX IF NOT EXISTS idx_schedules_start_date ON schedules("startDate");
+CREATE INDEX IF NOT EXISTS idx_schedules_room_start ON schedules("roomId", "startDate" DESC);
+
+-- 2.10 schedule_participants 인덱스 (일정 참여자 조회 최적화)
+CREATE INDEX IF NOT EXISTS idx_schedule_participants_schedule ON schedule_participants("scheduleId");
+CREATE INDEX IF NOT EXISTS idx_schedule_participants_user ON schedule_participants("userId");
+
 -- ========================================
 -- 3. 트리거 생성 (자동 updatedAt)
 -- ========================================
@@ -192,6 +231,13 @@ CREATE TRIGGER update_chat_rooms_updated_at
 DROP TRIGGER IF EXISTS update_push_subscriptions_updated_at ON push_subscriptions;
 CREATE TRIGGER update_push_subscriptions_updated_at 
   BEFORE UPDATE ON push_subscriptions 
+  FOR EACH ROW 
+  EXECUTE FUNCTION update_updated_at_column();
+
+-- schedules 트리거
+DROP TRIGGER IF EXISTS update_schedules_updated_at ON schedules;
+CREATE TRIGGER update_schedules_updated_at 
+  BEFORE UPDATE ON schedules 
   FOR EACH ROW 
   EXECUTE FUNCTION update_updated_at_column();
 
@@ -227,6 +273,8 @@ ANALYZE messages;
 ANALYZE friends;
 ANALYZE refresh_tokens;
 ANALYZE push_subscriptions;
+ANALYZE schedules;
+ANALYZE schedule_participants;
 
 -- 확인 쿼리
 SELECT 
@@ -241,6 +289,10 @@ UNION ALL
 SELECT 'friends', COUNT(*) FROM friends
 UNION ALL
 SELECT 'push_subscriptions', COUNT(*) FROM push_subscriptions
+UNION ALL
+SELECT 'schedules', COUNT(*) FROM schedules
+UNION ALL
+SELECT 'schedule_participants', COUNT(*) FROM schedule_participants
 ORDER BY table_name;
 
 -- 인덱스 확인
@@ -250,7 +302,7 @@ SELECT
   indexdef
 FROM pg_indexes
 WHERE schemaname = 'public'
-  AND tablename IN ('users', 'chat_rooms', 'chat_room_participants', 'messages', 'friends', 'push_subscriptions')
+  AND tablename IN ('users', 'chat_rooms', 'chat_room_participants', 'messages', 'friends', 'push_subscriptions', 'schedules', 'schedule_participants')
 ORDER BY tablename, indexname;
 
 -- ========================================
