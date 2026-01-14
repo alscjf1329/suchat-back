@@ -1,0 +1,23 @@
+{
+  "schedules": [
+    {
+      "name": "morning-push",
+      "cron": "0 9 * * *",
+      "enabled": true,
+      "description": "매일 오전 9시 푸시 알림",
+      "job": "npx ts-node -r tsconfig-paths/register batch/job/batch-push.ts"
+    },
+    {
+      "name": "evening-push",
+      "cron": "0 18 * * *",
+      "enabled": true,
+      "description": "매일 오후 6시 푸시 알림",
+      "job": "npx ts-node -r tsconfig-paths/register batch/job/batch-push.ts"
+    }
+  ],
+  "batch": {
+    "defaultTitle": "📢 정기 알림",
+    "defaultBody": "배치 스케줄러에서 전송된 알림입니다."
+  }
+}
+
