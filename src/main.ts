@@ -24,7 +24,7 @@ async function bootstrap() {
   // 업로드된 파일 서빙 설정
   const uploadPath = process.env.UPLOAD_PATH || './uploads';
   const uploadsDir = uploadPath.startsWith('.') 
-    ? join(__dirname, '..', uploadPath) 
+    ? join(process.cwd(), uploadPath.replace(/^\.\//, '')) 
     : uploadPath;
   
   console.log(`📤 업로드 경로: ${uploadsDir}`);
