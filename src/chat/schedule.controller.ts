@@ -13,6 +13,36 @@ export class ScheduleController {
     private readonly chatService: ChatService,
   ) {}
 
+  /**
+   * ISO string 또는 yyyymmddHH24mmss 형식을 yyyymmddHH24mmss 형식으로 변환
+   */
+  private convertToDateFormat(dateStr: string | undefined): string | undefined {
+    if (!dateStr) return undefined;
+    
+    // 이미 yyyymmddHH24mmss 형식인 경우 (14자리 숫자)
+    if (/^\d{14}$/.test(dateStr)) {
+      return dateStr;
+    }
+    
+    // ISO string 형식인 경우 변환
+    try {
+      const date = new Date(dateStr);
+      if (isNaN(date.getTime())) {
+        throw new Error(`Invalid date format: ${dateStr}`);
+      }
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const hours = String(date.getHours()).padStart(2, '0');
+      const minutes = String(date.getMinutes()).padStart(2, '0');
+      const seconds = String(date.getSeconds()).padStart(2, '0');
+      return `${year}${month}${day}${hours}${minutes}${seconds}`;
+    } catch (error) {
+      this.logger.warn(`날짜 변환 실패: ${dateStr}`, error);
+      return dateStr; // 변환 실패 시 원본 반환
+    }
+  }
+
   // 일정 생성
   @Post(':roomId')
   async createSchedule(
@@ -20,9 +50,9 @@ export class ScheduleController {
     @Body() data: {
       title: string;
       memo?: string;
-      startDate: string; // ISO string
-      endDate?: string; // ISO string
-      notificationDateTime?: string; // ISO string
+      startDate: string; // ISO string 또는 yyyymmddHH24mmss
+      endDate?: string; // ISO string 또는 yyyymmddHH24mmss
+      notificationDateTime?: string; // ISO string 또는 yyyymmddHH24mmss
       notificationInterval?: string; // 분 단위
       notificationRepeatCount?: string; // 반복 횟수
       participantIds: string[];
@@ -39,9 +69,9 @@ export class ScheduleController {
       const schedule = await this.scheduleService.createSchedule(roomId, req.user.userId, {
         title: data.title,
         memo: data.memo,
-        startDate: new Date(data.startDate),
-        endDate: data.endDate ? new Date(data.endDate) : undefined,
-        notificationDateTime: data.notificationDateTime ? new Date(data.notificationDateTime) : undefined,
+        startDate: this.convertToDateFormat(data.startDate)!,
+        endDate: this.convertToDateFormat(data.endDate),
+        notificationDateTime: this.convertToDateFormat(data.notificationDateTime),
         notificationInterval: data.notificationInterval,
         notificationRepeatCount: data.notificationRepeatCount,
         participantIds: data.participantIds || [],
@@ -108,9 +138,9 @@ export class ScheduleController {
     @Body() data: {
       title?: string;
       memo?: string;
-      startDate?: string; // ISO string
-      endDate?: string; // ISO string
-      notificationDateTime?: string; // ISO string
+      startDate?: string; // ISO string 또는 yyyymmddHH24mmss
+      endDate?: string; // ISO string 또는 yyyymmddHH24mmss
+      notificationDateTime?: string; // ISO string 또는 yyyymmddHH24mmss
       notificationInterval?: string; // 분 단위
       notificationRepeatCount?: string; // 반복 횟수
       participantIds?: string[];
@@ -120,9 +150,9 @@ export class ScheduleController {
     const schedule = await this.scheduleService.updateSchedule(scheduleId, req.user.userId, {
       title: data.title,
       memo: data.memo,
-      startDate: data.startDate ? new Date(data.startDate) : undefined,
-      endDate: data.endDate ? new Date(data.endDate) : undefined,
-      notificationDateTime: data.notificationDateTime ? new Date(data.notificationDateTime) : undefined,
+      startDate: data.startDate ? this.convertToDateFormat(data.startDate) : undefined,
+      endDate: data.endDate ? this.convertToDateFormat(data.endDate) : undefined,
+      notificationDateTime: data.notificationDateTime ? this.convertToDateFormat(data.notificationDateTime) : undefined,
       notificationInterval: data.notificationInterval,
       notificationRepeatCount: data.notificationRepeatCount,
       participantIds: data.participantIds,

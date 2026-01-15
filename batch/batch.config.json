@@ -1,18 +1,11 @@
 {
   "schedules": [
     {
-      "name": "morning-push",
-      "cron": "0 9 * * *",
+      "name": "schedule-notification",
+      "cron": "* * * * *",
       "enabled": true,
-      "description": "매일 오전 9시 푸시 알림",
-      "job": "npx ts-node -r tsconfig-paths/register batch/job/batch-push.ts"
-    },
-    {
-      "name": "evening-push",
-      "cron": "0 18 * * *",
-      "enabled": true,
-      "description": "매일 오후 6시 푸시 알림",
-      "job": "npx ts-node -r tsconfig-paths/register batch/job/batch-push.ts"
+      "description": "매 분마다 일정 알림 전송 (정확한 시간에 알림)",
+      "job": "pnpm exec ts-node -r tsconfig-paths/register batch/job/schedule-notification.ts"
     }
   ],
   "batch": {

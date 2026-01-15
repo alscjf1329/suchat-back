@@ -127,11 +127,12 @@ CREATE TABLE IF NOT EXISTS schedules (
   "createdBy" UUID NOT NULL,
   title VARCHAR(255) NOT NULL,
   memo TEXT,
-  "startDate" TIMESTAMP NOT NULL,
-  "endDate" TIMESTAMP,
-  "notificationDateTime" TIMESTAMP,
+  "startDate" VARCHAR(14) NOT NULL,
+  "endDate" VARCHAR(14),
+  "notificationDateTime" VARCHAR(14),
   "notificationInterval" VARCHAR(10),
   "notificationRepeatCount" VARCHAR(10),
+  "notificationSent" SMALLINT NOT NULL DEFAULT 0,
   "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   "updatedAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY ("roomId") REFERENCES chat_rooms(id) ON DELETE CASCADE,
@@ -195,6 +196,14 @@ CREATE INDEX IF NOT EXISTS idx_schedules_room ON schedules("roomId");
 CREATE INDEX IF NOT EXISTS idx_schedules_created_by ON schedules("createdBy");
 CREATE INDEX IF NOT EXISTS idx_schedules_start_date ON schedules("startDate");
 CREATE INDEX IF NOT EXISTS idx_schedules_room_start ON schedules("roomId", "startDate" DESC);
+-- 배치 알림 쿼리 최적화 (notificationDateTime 필터링)
+CREATE INDEX IF NOT EXISTS idx_schedules_notification_datetime 
+  ON schedules("notificationDateTime") 
+  WHERE "notificationDateTime" IS NOT NULL;
+-- 배치 알림 쿼리 최적화 (복합 인덱스: notificationDateTime + startDate)
+CREATE INDEX IF NOT EXISTS idx_schedules_notification_and_start 
+  ON schedules("notificationDateTime", "startDate") 
+  WHERE "notificationDateTime" IS NOT NULL;
 
 -- 2.10 schedule_participants 인덱스 (일정 참여자 조회 최적화)
 CREATE INDEX IF NOT EXISTS idx_schedule_participants_schedule ON schedule_participants("scheduleId");

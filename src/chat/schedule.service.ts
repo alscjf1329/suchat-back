@@ -4,6 +4,35 @@ import { Repository, In } from 'typeorm';
 import { Schedule, ScheduleParticipant } from './entities';
 import { ChatRoom } from './entities/chat-room.entity';
 
+/**
+ * 날짜를 yyyymmddHH24mmss 형식으로 변환
+ */
+function formatDateToString(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  const seconds = String(date.getSeconds()).padStart(2, '0');
+  return `${year}${month}${day}${hours}${minutes}${seconds}`;
+}
+
+/**
+ * yyyymmddHH24mmss 형식 문자열을 Date로 변환
+ */
+function parseDateFromString(dateStr: string): Date {
+  if (!dateStr || dateStr.length !== 14) {
+    throw new Error(`Invalid date format: ${dateStr}. Expected yyyymmddHH24mmss (14 characters)`);
+  }
+  const year = parseInt(dateStr.substring(0, 4), 10);
+  const month = parseInt(dateStr.substring(4, 6), 10) - 1; // month is 0-indexed
+  const day = parseInt(dateStr.substring(6, 8), 10);
+  const hours = parseInt(dateStr.substring(8, 10), 10);
+  const minutes = parseInt(dateStr.substring(10, 12), 10);
+  const seconds = parseInt(dateStr.substring(12, 14), 10);
+  return new Date(year, month, day, hours, minutes, seconds);
+}
+
 @Injectable()
 export class ScheduleService {
   private readonly logger = new Logger(ScheduleService.name);
@@ -24,9 +53,9 @@ export class ScheduleService {
     data: {
       title: string;
       memo?: string;
-      startDate: Date;
-      endDate?: Date;
-      notificationDateTime?: Date;
+      startDate: string; // yyyymmddHH24mmss
+      endDate?: string; // yyyymmddHH24mmss
+      notificationDateTime?: string; // yyyymmddHH24mmss
       notificationInterval?: string;
       notificationRepeatCount?: string;
       participantIds: string[];
@@ -225,9 +254,9 @@ export class ScheduleService {
     data: {
       title?: string;
       memo?: string;
-      startDate?: Date;
-      endDate?: Date;
-      notificationDateTime?: Date;
+      startDate?: string; // yyyymmddHH24mmss
+      endDate?: string; // yyyymmddHH24mmss
+      notificationDateTime?: string; // yyyymmddHH24mmss
       notificationInterval?: string;
       notificationRepeatCount?: string;
       participantIds?: string[];
