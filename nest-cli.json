@@ -4,6 +4,7 @@
   "sourceRoot": "src",
   "compilerOptions": {
     "deleteOutDir": true,
-    "rootDir": "src"
+    "rootDir": "src",
+    "outDir": "dist"
   }
 }
