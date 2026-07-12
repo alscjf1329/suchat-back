@@ -198,6 +198,22 @@ export class AuthController {
         'signup'
       );
 
+      // 개발 편의: SKIP_EMAIL_VERIFICATION=true면 메일 발송 없이 즉시 인증 처리 (프로덕션에선 무시)
+      if (
+        process.env.SKIP_EMAIL_VERIFICATION === 'true' &&
+        process.env.NODE_ENV !== 'production'
+      ) {
+        const result = await this.emailVerificationService.verifyEmail(token);
+        if (!result.success) {
+          return result;
+        }
+        return {
+          success: true,
+          verified: true,
+          message: '회원가입이 완료되었습니다. (개발 모드: 이메일 인증 생략)',
+        };
+      }
+
       // 이메일 발송
       const emailSent = await this.emailService.sendVerificationEmail(
         email,
