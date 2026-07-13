@@ -26,7 +26,7 @@ export class ChatRoomParticipant {
   @Column({ type: 'boolean', default: false })
   pinned: boolean;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   joinedAt: Date;
 
   @ManyToOne(() => ChatRoom, { onDelete: 'CASCADE' })

@@ -41,7 +41,7 @@ export class Message {
     thumbnailUrl?: string;
   }>;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   timestamp: Date;
 
   @ManyToOne(() => ChatRoom, room => room.messages)

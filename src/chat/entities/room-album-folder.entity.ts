@@ -22,7 +22,7 @@ export class RoomAlbumFolder {
   @Column({ type: 'text', nullable: true })
   description?: string; // 폴더 설명
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;
 
   @ManyToOne(() => ChatRoom)

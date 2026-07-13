@@ -38,10 +38,10 @@ export class Schedule {
   @Column({ type: 'smallint', default: 0 })
   notificationSent: number; // 푸시 알림 전송 여부 (0: 미전송, 1: 전송됨, 확장 가능)
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ type: 'timestamptz' })
   updatedAt: Date;
 
   @ManyToOne(() => ChatRoom, { onDelete: 'CASCADE' })

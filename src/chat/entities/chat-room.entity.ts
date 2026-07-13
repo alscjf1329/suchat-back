@@ -19,16 +19,16 @@ export class ChatRoom {
   @Column({ type: 'uuid', nullable: true })
   lastMessageId?: string;
 
-  @Column({ type: 'timestamp', nullable: true })
+  @Column({ type: 'timestamptz', nullable: true })
   lastMessageAt?: Date;
 
   @Column({ type: 'varchar', nullable: true, unique: true })
   dmKey?: string; // DM(1:1) 중복 방지용
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ type: 'timestamptz' })
   updatedAt: Date;
 
   @OneToMany(() => Message, message => message.room)

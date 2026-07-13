@@ -19,10 +19,10 @@ export class RefreshToken {
   @Column({ type: 'varchar', length: 500 })
   token: string;
 
-  @Column({ type: 'timestamp' })
+  @Column({ type: 'timestamptz' })
   expiresAt: Date;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;
 
   @ManyToOne(() => User, { onDelete: 'CASCADE' })

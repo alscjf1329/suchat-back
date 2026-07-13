@@ -31,7 +31,7 @@ export class RoomAlbum {
   @Column({ type: 'integer' })
   fileSize: number; // 파일 크기
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   uploadedAt: Date;
 
   @ManyToOne(() => ChatRoom)

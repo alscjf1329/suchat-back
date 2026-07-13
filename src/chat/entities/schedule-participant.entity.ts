@@ -14,7 +14,7 @@ export class ScheduleParticipant {
   @Column({ type: 'uuid' })
   userId: string; // 참여자 ID
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;
 
   @ManyToOne(() => Schedule, schedule => schedule.participants, { onDelete: 'CASCADE' })

@@ -35,16 +35,16 @@ export class UserDevice {
   @Column({ type: 'varchar', length: 500, nullable: true })
   userAgent?: string; // 디바이스 정보 (선택)
 
-  @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
+  @Column({ type: 'timestamptz', default: () => 'CURRENT_TIMESTAMP' })
   lastLoginAt: Date;
 
   @Column({ type: 'boolean', default: true })
   isActive: boolean; // 활성화 상태
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ type: 'timestamptz' })
   updatedAt: Date;
 }
 

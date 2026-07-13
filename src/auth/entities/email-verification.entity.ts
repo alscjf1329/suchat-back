@@ -20,7 +20,7 @@ export class EmailVerification {
   @Column({ type: 'varchar', length: 50, default: 'signup' })
   type: string;
 
-  @Column({ type: 'timestamp' })
+  @Column({ type: 'timestamptz' })
   expiresAt: Date;
 
   @Column({ type: 'boolean', default: false })
@@ -30,9 +30,9 @@ export class EmailVerification {
   @Column({ type: 'jsonb', nullable: true })
   userData?: any;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ type: 'timestamptz' })
   updatedAt: Date;
 }

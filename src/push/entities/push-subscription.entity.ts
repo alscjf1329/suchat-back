@@ -47,10 +47,10 @@ export class PushSubscription {
   @Column({ type: 'boolean', default: true })
   isActive: boolean; // 활성화 상태
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ type: 'timestamptz' })
   updatedAt: Date;
 }
 
