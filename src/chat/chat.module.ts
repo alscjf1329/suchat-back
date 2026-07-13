@@ -5,6 +5,7 @@ import { ChatService } from './chat.service';
 import { ChatAlbumController } from './chat-album.controller';
 import { ChatAlbumService } from './chat-album.service';
 import { ScheduleController } from './schedule.controller';
+import { LinkPreviewController } from './link-preview.controller';
 import { ScheduleService } from './schedule.service';
 import { PostgresChatRepository } from './repositories/postgres-chat.repository';
 import { MemoryChatRepository } from './repositories/memory-chat.repository';
@@ -16,7 +17,7 @@ import { PushModule } from '../push/push.module';
     TypeOrmModule.forFeature([ChatRoom, Message, ChatRoomParticipant, RoomAlbum, RoomAlbumFolder, Schedule, ScheduleParticipant]),
     PushModule,
   ],
-  controllers: [ChatAlbumController, ScheduleController],
+  controllers: [ChatAlbumController, ScheduleController, LinkPreviewController],
   providers: [
     ChatGateway,
     ChatService,
