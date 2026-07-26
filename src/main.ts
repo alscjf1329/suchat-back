@@ -4,6 +4,12 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { ValidationPipe } from '@nestjs/common';
 import { join } from 'path';
 import compression from 'compression';
+import { types } from 'pg';
+
+// pg 드라이버가 timestamp without time zone 컬럼을 로컬 타임존으로 잘못 파싱하는 문제 수정
+// OID 1114 = timestamp, OID 1184 = timestamptz
+// DB에 UTC로 저장된 값이 KST로 파싱되어 9시간 오차 발생 → 강제로 UTC로 해석
+types.setTypeParser(1114, (val: string) => new Date(val + 'Z'));
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
