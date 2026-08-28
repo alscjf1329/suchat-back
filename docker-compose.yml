@@ -9,6 +9,7 @@ services:
       - "8080:8080"
     volumes:
       - /data/suchat:/data/suchat
+      - /log/suchat:/log/suchat
     env_file:
       - .env
     environment:
