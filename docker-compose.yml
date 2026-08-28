@@ -1,0 +1,23 @@
+services:
+  back:
+    build: .
+    container_name: suchat-back
+    networks:
+      - default
+      - database_default
+    ports:
+      - "8080:8080"
+    volumes:
+      - /data/suchat:/data/suchat
+    env_file:
+      - .env
+    environment:
+      # 이미 떠 있는 suchat-postgres/suchat-redis 컨테이너를 database_default 네트워크의
+      # DNS 별칭(postgres/redis)으로 찾음 — .env 파일 자체는 localhost로 그대로 둠
+      - DB_HOST=postgres
+      - REDIS_HOST=redis
+    restart: unless-stopped
+
+networks:
+  database_default:
+    external: true
